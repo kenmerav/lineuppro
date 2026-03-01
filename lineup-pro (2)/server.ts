@@ -1,1 +1,268 @@
-Not found
+import bcrypt from "bcryptjs";
+import cookieParser from "cookie-parser";
+import dotenv from "dotenv";
+import express, { NextFunction, Request, Response } from "express";
+import jwt from "jsonwebtoken";
+import { createServer as createViteServer } from "vite";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import fs from "node:fs/promises";
+
+dotenv.config();
+
+type Player = { id: string; name: string; color: string; active?: boolean };
+type TeamBranding = { teamName: string; logoDataUrl?: string; bannerColor?: string };
+type Settings = {
+  inningsCount: number;
+  allowEmptyOutfield: boolean;
+  requireDugout: boolean;
+  strictSwap: boolean;
+  maxConsecutiveInfield: number;
+  maxConsecutiveOutfield: number;
+  allowSamePositionBackToBack: boolean;
+};
+type Team = {
+  id: string;
+  ownerId: string;
+  name: string;
+  branding: TeamBranding;
+  settings: Settings;
+  roster: Player[];
+};
+type SavedGame = {
+  id: string;
+  teamId: string;
+  ownerId: string;
+  meta: Record<string, unknown>;
+  players: Player[];
+  battingOrder: string[];
+  assignments: Record<string, unknown>;
+  settings: Settings;
+  branding: TeamBranding;
+  log?: Record<string, unknown>;
+};
+type User = {
+  id: string;
+  name: string;
+  email: string;
+  passwordHash: string;
+};
+type AuthedRequest = Request & { userId?: string };
+
+const app = express();
+const PORT = Number(process.env.PORT || 5173);
+const JWT_SECRET = process.env.JWT_SECRET || "dev-only-secret-change-me";
+const TOKEN_COOKIE = "lineup_pro_token";
+
+const DEFAULT_SETTINGS: Settings = {
+  inningsCount: 5,
+  allowEmptyOutfield: true,
+  requireDugout: true,
+  strictSwap: true,
+  maxConsecutiveInfield: 2,
+  maxConsecutiveOutfield: 2,
+  allowSamePositionBackToBack: false,
+};
+
+const users = new Map<string, User>();
+const teams = new Map<string, Team>();
+const gamesByTeam = new Map<string, SavedGame[]>();
+
+app.use(express.json({ limit: "5mb" }));
+app.use(cookieParser());
+
+function setAuthCookie(res: Response, userId: string) {
+  const token = jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: "14d" });
+  res.cookie(TOKEN_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: false,
+    maxAge: 14 * 24 * 60 * 60 * 1000,
+  });
+}
+
+function auth(req: AuthedRequest, res: Response, next: NextFunction) {
+  const token = req.cookies?.[TOKEN_COOKIE];
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const payload = jwt.verify(token, JWT_SECRET) as { sub?: string };
+    if (!payload?.sub || !users.has(payload.sub)) return res.status(401).json({ error: "Unauthorized" });
+    req.userId = payload.sub;
+    next();
+  } catch {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+}
+
+function teamFor(req: AuthedRequest, teamId: string) {
+  const team = teams.get(teamId);
+  if (!team || team.ownerId !== req.userId) return null;
+  return team;
+}
+
+function ensureDefaultTeam(userId: string) {
+  const alreadyHasTeam = [...teams.values()].some((t) => t.ownerId === userId);
+  if (alreadyHasTeam) return;
+  const teamId = crypto.randomUUID();
+  teams.set(teamId, {
+    id: teamId,
+    ownerId: userId,
+    name: "My Team",
+    branding: { teamName: "My Team" },
+    settings: { ...DEFAULT_SETTINGS },
+    roster: [],
+  });
+  gamesByTeam.set(teamId, []);
+}
+
+app.post("/api/auth/register", async (req, res) => {
+  const name = String(req.body?.name || "").trim();
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const password = String(req.body?.password || "");
+  if (!name || !email || password.length < 6) {
+    return res.status(400).json({ error: "Name, email, and 6+ char password are required." });
+  }
+  if ([...users.values()].some((u) => u.email === email)) {
+    return res.status(409).json({ error: "Email already in use." });
+  }
+
+  const userId = crypto.randomUUID();
+  const passwordHash = await bcrypt.hash(password, 10);
+  users.set(userId, { id: userId, name, email, passwordHash });
+  ensureDefaultTeam(userId);
+  setAuthCookie(res, userId);
+  return res.json({ id: userId, name, email });
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const password = String(req.body?.password || "");
+  const user = [...users.values()].find((u) => u.email === email);
+  if (!user) return res.status(401).json({ error: "Invalid credentials." });
+
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) return res.status(401).json({ error: "Invalid credentials." });
+
+  setAuthCookie(res, user.id);
+  return res.json({ id: user.id, name: user.name, email: user.email });
+});
+
+app.get("/api/auth/me", auth, (req: AuthedRequest, res) => {
+  const user = users.get(req.userId!);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  return res.json({ id: user.id, name: user.name, email: user.email });
+});
+
+app.post("/api/auth/logout", (_req, res) => {
+  res.clearCookie(TOKEN_COOKIE);
+  return res.status(204).end();
+});
+
+app.get("/api/teams", auth, (req: AuthedRequest, res) => {
+  const userTeams = [...teams.values()].filter((t) => t.ownerId === req.userId);
+  return res.json(userTeams);
+});
+
+app.post("/api/teams", auth, (req: AuthedRequest, res) => {
+  const name = String(req.body?.name || "New Team").trim();
+  const teamId = crypto.randomUUID();
+  const branding: TeamBranding = req.body?.branding || { teamName: name || "New Team" };
+  const settings: Settings = { ...DEFAULT_SETTINGS, ...(req.body?.settings || {}) };
+  const roster: Player[] = Array.isArray(req.body?.roster) ? req.body.roster : [];
+
+  const team: Team = {
+    id: teamId,
+    ownerId: req.userId!,
+    name: name || "New Team",
+    branding,
+    settings,
+    roster,
+  };
+  teams.set(teamId, team);
+  gamesByTeam.set(teamId, []);
+  return res.status(201).json(team);
+});
+
+app.put("/api/teams/:teamId", auth, (req: AuthedRequest, res) => {
+  const team = teamFor(req, req.params.teamId);
+  if (!team) return res.status(404).json({ error: "Team not found" });
+
+  const next: Team = {
+    ...team,
+    name: String(req.body?.name || team.name),
+    branding: req.body?.branding || team.branding,
+    settings: req.body?.settings || team.settings,
+    roster: Array.isArray(req.body?.roster) ? req.body.roster : team.roster,
+  };
+  teams.set(team.id, next);
+  return res.json(next);
+});
+
+app.get("/api/teams/:teamId/games", auth, (req: AuthedRequest, res) => {
+  const team = teamFor(req, req.params.teamId);
+  if (!team) return res.status(404).json({ error: "Team not found" });
+  return res.json(gamesByTeam.get(team.id) || []);
+});
+
+app.post("/api/teams/:teamId/games", auth, (req: AuthedRequest, res) => {
+  const team = teamFor(req, req.params.teamId);
+  if (!team) return res.status(404).json({ error: "Team not found" });
+
+  const game: SavedGame = {
+    id: crypto.randomUUID(),
+    teamId: team.id,
+    ownerId: req.userId!,
+    meta: req.body?.meta || {},
+    players: Array.isArray(req.body?.players) ? req.body.players : [],
+    battingOrder: Array.isArray(req.body?.battingOrder)
+      ? req.body.battingOrder
+      : Array.isArray(req.body?.batting_order)
+        ? req.body.batting_order
+        : [],
+    assignments: req.body?.assignments || { innings: team.settings.inningsCount, byInning: {} },
+    settings: req.body?.settings || team.settings,
+    branding: req.body?.branding || team.branding,
+    log: req.body?.log,
+  };
+
+  const games = gamesByTeam.get(team.id) || [];
+  games.push(game);
+  gamesByTeam.set(team.id, games);
+  return res.status(201).json({ id: game.id });
+});
+
+app.delete("/api/teams/:teamId/games/:gameId", auth, (req: AuthedRequest, res) => {
+  const team = teamFor(req, req.params.teamId);
+  if (!team) return res.status(404).json({ error: "Team not found" });
+
+  const games = gamesByTeam.get(team.id) || [];
+  gamesByTeam.set(
+    team.id,
+    games.filter((g) => g.id !== req.params.gameId),
+  );
+  return res.status(204).end();
+});
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const vite = await createViteServer({
+  server: { middlewareMode: true },
+  appType: "spa",
+});
+
+app.use(vite.middlewares);
+
+app.use("*", async (req, res, next) => {
+  try {
+    const templatePath = path.resolve(__dirname, "index.html");
+    const template = await fs.readFile(templatePath, "utf-8");
+    const html = await vite.transformIndexHtml(req.originalUrl, template);
+    res.status(200).setHeader("Content-Type", "text/html").end(html);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Lineup Pro dev server running on http://localhost:${PORT}`);
+});

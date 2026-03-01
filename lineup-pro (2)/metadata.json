@@ -1,1 +1,5 @@
-Not found
+{
+  "name": "lineup-pro",
+  "version": "0.1.0",
+  "description": "Softball lineup planner and game tracker"
+}
