@@ -22,5 +22,8 @@ export const DEFAULT_SETTINGS = {
   strictSwap: true,
   maxConsecutiveInfield: 2,
   maxConsecutiveOutfield: 2,
+  maxConsecutiveBench: 2,
   allowSamePositionBackToBack: false,
+  preventDuplicatePositionInGame: false,
+  requireEarlyInfieldByInning3: true,
 };

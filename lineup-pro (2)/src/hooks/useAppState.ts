@@ -35,7 +35,7 @@ export function useAppState(teamId?: string) {
         const team = teams.find((t: any) => t.id === teamId);
         if (team) {
           setBranding(team.branding);
-          setSettings(team.settings);
+          setSettings({ ...DEFAULT_SETTINGS, ...(team.settings || {}) });
           setMasterRoster(team.roster);
           // For a new game session, we start with master roster
           setPlayers(team.roster);
@@ -329,7 +329,7 @@ export function useAppState(teamId?: string) {
     setPlayers(game.players);
     setBattingOrder(game.battingOrder);
     setAssignments(game.assignments);
-    setSettings(game.settings);
+    setSettings({ ...DEFAULT_SETTINGS, ...(game.settings || {}) });
     setBranding(game.branding);
     setGameLog(game.log);
     setActiveGameId(game.id);

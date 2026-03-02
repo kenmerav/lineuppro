@@ -32,7 +32,10 @@ export interface Settings {
   strictSwap: boolean;
   maxConsecutiveInfield: number;
   maxConsecutiveOutfield: number;
+  maxConsecutiveBench: number;
   allowSamePositionBackToBack: boolean;
+  preventDuplicatePositionInGame: boolean;
+  requireEarlyInfieldByInning3: boolean;
 }
 
 export interface GameMeta {

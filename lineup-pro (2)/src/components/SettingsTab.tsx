@@ -137,6 +137,26 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
               </div>
             </div>
 
+            <div className="border-t border-slate-50 pt-4">
+              <p className="font-bold text-slate-700 mb-2">Max Consecutive Bench Innings</p>
+              <p className="text-xs text-slate-400 mb-3">Prevents the same player from sitting too many innings in a row.</p>
+              <div className="flex items-center gap-2">
+                {[1, 2, 3, 4, 5].map(num => (
+                  <button
+                    key={num}
+                    onClick={() => handleChange('maxConsecutiveBench', num)}
+                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                      settings.maxConsecutiveBench === num 
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100' 
+                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    }`}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="flex items-center justify-between border-t border-slate-50 pt-4">
               <div>
                 <p className="font-bold text-slate-700">Allow Same Position Back-to-Back</p>
@@ -147,6 +167,32 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
                 className={`w-12 h-6 rounded-full transition-colors relative ${settings.allowSamePositionBackToBack ? 'bg-indigo-600' : 'bg-slate-200'}`}
               >
                 <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${settings.allowSamePositionBackToBack ? 'left-7' : 'left-1'}`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-slate-50 pt-4">
+              <div>
+                <p className="font-bold text-slate-700">Prevent Duplicate Positions In One Game</p>
+                <p className="text-xs text-slate-400">Treat repeated use of the same exact position for a player as a hard violation.</p>
+              </div>
+              <button 
+                onClick={() => handleChange('preventDuplicatePositionInGame', !settings.preventDuplicatePositionInGame)}
+                className={`w-12 h-6 rounded-full transition-colors relative ${settings.preventDuplicatePositionInGame ? 'bg-indigo-600' : 'bg-slate-200'}`}
+              >
+                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${settings.preventDuplicatePositionInGame ? 'left-7' : 'left-1'}`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-slate-50 pt-4">
+              <div>
+                <p className="font-bold text-slate-700">Require Infield By Inning 3 (If Possible)</p>
+                <p className="text-xs text-slate-400">Forces each player to get at least one infield inning in the first 3 when math allows.</p>
+              </div>
+              <button 
+                onClick={() => handleChange('requireEarlyInfieldByInning3', !settings.requireEarlyInfieldByInning3)}
+                className={`w-12 h-6 rounded-full transition-colors relative ${settings.requireEarlyInfieldByInning3 ? 'bg-indigo-600' : 'bg-slate-200'}`}
+              >
+                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${settings.requireEarlyInfieldByInning3 ? 'left-7' : 'left-1'}`} />
               </button>
             </div>
           </div>

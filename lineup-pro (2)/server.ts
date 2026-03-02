@@ -19,7 +19,10 @@ type Settings = {
   strictSwap: boolean;
   maxConsecutiveInfield: number;
   maxConsecutiveOutfield: number;
+  maxConsecutiveBench: number;
   allowSamePositionBackToBack: boolean;
+  preventDuplicatePositionInGame: boolean;
+  requireEarlyInfieldByInning3: boolean;
 };
 type Team = {
   id: string;
@@ -83,7 +86,10 @@ const DEFAULT_SETTINGS: Settings = {
   strictSwap: true,
   maxConsecutiveInfield: 2,
   maxConsecutiveOutfield: 2,
+  maxConsecutiveBench: 2,
   allowSamePositionBackToBack: false,
+  preventDuplicatePositionInGame: false,
+  requireEarlyInfieldByInning3: true,
 };
 
 const users = new Map<string, User>();
@@ -260,7 +266,7 @@ app.put("/api/teams/:teamId", auth, async (req: AuthedRequest, res) => {
     ...team,
     name: String(req.body?.name || team.name),
     branding: req.body?.branding || team.branding,
-    settings: req.body?.settings || team.settings,
+    settings: { ...DEFAULT_SETTINGS, ...team.settings, ...(req.body?.settings || {}) },
     roster: Array.isArray(req.body?.roster) ? req.body.roster : team.roster,
   };
   teams.set(team.id, next);
@@ -294,7 +300,7 @@ app.put("/api/teams/:teamId/draft", auth, async (req: AuthedRequest, res) => {
         ? req.body.batting_order
         : [],
     assignments: req.body?.assignments || { innings: team.settings.inningsCount, byInning: {} },
-    settings: req.body?.settings || team.settings,
+    settings: { ...DEFAULT_SETTINGS, ...team.settings, ...(req.body?.settings || {}) },
     branding: req.body?.branding || team.branding,
     log: req.body?.log,
     updatedAt: new Date().toISOString(),
@@ -321,7 +327,7 @@ app.post("/api/teams/:teamId/games", auth, async (req: AuthedRequest, res) => {
         ? req.body.batting_order
         : [],
     assignments: req.body?.assignments || { innings: team.settings.inningsCount, byInning: {} },
-    settings: req.body?.settings || team.settings,
+    settings: { ...DEFAULT_SETTINGS, ...team.settings, ...(req.body?.settings || {}) },
     branding: req.body?.branding || team.branding,
     log: req.body?.log,
   };
@@ -352,7 +358,7 @@ app.put("/api/teams/:teamId/games/:gameId", auth, async (req: AuthedRequest, res
         ? req.body.batting_order
         : existing.battingOrder,
     assignments: req.body?.assignments || existing.assignments,
-    settings: req.body?.settings || existing.settings,
+    settings: { ...DEFAULT_SETTINGS, ...existing.settings, ...(req.body?.settings || {}) },
     branding: req.body?.branding || existing.branding,
     log: req.body?.log ?? existing.log,
   };
