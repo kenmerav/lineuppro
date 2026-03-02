@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Lineup Pro logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a" />
+      <stop offset="1" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#38bdf8" />
+      <stop offset="1" stop-color="#6366f1" />
+    </linearGradient>
+  </defs>
+
+  <rect x="4" y="4" width="120" height="120" rx="24" fill="url(#bg)" />
+
+  <path d="M22 70 A42 42 0 0 1 106 70" fill="none" stroke="#94a3b8" stroke-opacity="0.35" stroke-width="2.5" />
+  <path d="M34 74 L64 104 L94 74" fill="none" stroke="#94a3b8" stroke-opacity="0.4" stroke-width="2.5" />
+  <path d="M64 48 L80 64 L64 80 L48 64 Z" fill="none" stroke="#cbd5e1" stroke-opacity="0.6" stroke-width="2.5" />
+
+  <path d="M42 34 V88 H52 V34 Z" fill="#e2e8f0" />
+  <path d="M42 88 H70 Q86 88 86 72 V62 Q86 46 70 46 H52 V56 H68 Q76 56 76 64 V70 Q76 78 68 78 H52 V88 Z" fill="#e2e8f0" />
+
+  <circle cx="64" cy="104" r="3.2" fill="url(#accent)" />
+  <circle cx="48" cy="64" r="2.8" fill="url(#accent)" />
+  <circle cx="80" cy="64" r="2.8" fill="url(#accent)" />
+</svg>
