@@ -16,7 +16,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Hash } from 'lucide-react';
+import { GripVertical, Hash, Save } from 'lucide-react';
 import { Player, DefenseAssignments } from '../types';
 import { ALL_POSITIONS } from '../constants';
 
@@ -25,6 +25,7 @@ interface BattingTabProps {
   battingOrder: string[];
   assignments: DefenseAssignments;
   onReorder: (newOrder: string[]) => void;
+  onSaveAsGame: () => Promise<void>;
 }
 
 interface SortableItemProps {
@@ -116,7 +117,7 @@ const SortableItem: React.FC<SortableItemProps> = ({ id, player, index, assignme
   );
 };
 
-export const BattingTab: React.FC<BattingTabProps> = ({ players, battingOrder, assignments, onReorder }) => {
+export const BattingTab: React.FC<BattingTabProps> = ({ players, battingOrder, assignments, onReorder, onSaveAsGame }) => {
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -139,8 +140,16 @@ export const BattingTab: React.FC<BattingTabProps> = ({ players, battingOrder, a
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
       <div className="flex items-center gap-2 mb-4">
-        <Hash className="text-indigo-600" />
-        <h2 className="text-xl font-bold text-slate-800">Batting Order</h2>
+        <div className="flex items-center gap-2">
+          <Hash className="text-indigo-600" />
+          <h2 className="text-xl font-bold text-slate-800">Batting Order</h2>
+        </div>
+        <button
+          onClick={() => void onSaveAsGame()}
+          className="ml-auto inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
+        >
+          <Save size={16} /> Save As Game
+        </button>
       </div>
 
       <DndContext

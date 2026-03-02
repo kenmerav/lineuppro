@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Shield, AlertCircle, CheckCircle2, RefreshCw, Trash2, ChevronLeft, ChevronRight, UserPlus, LayoutGrid, Map as MapIcon } from 'lucide-react';
+import { Shield, AlertCircle, CheckCircle2, RefreshCw, Trash2, ChevronLeft, ChevronRight, UserPlus, LayoutGrid, Map as MapIcon, Save } from 'lucide-react';
 import { Player, DefenseAssignments, Settings } from '../types';
 import { POSITION_GROUPS, ALL_POSITIONS } from '../constants';
 import { validateAll, autoFixViolations } from '../utils';
@@ -12,6 +12,7 @@ interface DefenseTabProps {
   settings: Settings;
   onUpdate: (assignments: DefenseAssignments) => void;
   onGenerate: () => void;
+  onSaveAsGame: () => Promise<void>;
   selectedInning: number;
   onSelectedInningChange: (inning: number) => void;
 }
@@ -22,6 +23,7 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
   settings,
   onUpdate,
   onGenerate,
+  onSaveAsGame,
   selectedInning,
   onSelectedInningChange
 }) => {
@@ -118,6 +120,13 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
             className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-indigo-700 transition-colors"
           >
             <RefreshCw size={18} /> Auto Generate
+          </button>
+
+          <button
+            onClick={() => void onSaveAsGame()}
+            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
+          >
+            <Save size={18} /> Save As Game
           </button>
 
           <button 

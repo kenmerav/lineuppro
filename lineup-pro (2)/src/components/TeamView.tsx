@@ -90,6 +90,40 @@ ${Array.from({ length: assignments.innings }, (_, i) => {
     alert('Lineup copied to clipboard!');
   };
 
+  const getNextDefaultGameName = () => {
+    const numbered = (savedGames || [])
+      .map((g) => {
+        const match = (g.meta.name || '').trim().match(/^game\s+(\d+)$/i);
+        return match ? Number(match[1]) : null;
+      })
+      .filter((n): n is number => Number.isFinite(n as number));
+    const nextNumber = numbered.length > 0 ? Math.max(...numbered) + 1 : (savedGames.length + 1);
+    return `Game ${nextNumber}`;
+  };
+
+  const handleSaveCurrentAsGame = async () => {
+    const defaultName = getNextDefaultGameName();
+    const enteredName = window.prompt('Save current lineup as:', defaultName);
+    if (enteredName === null) return;
+
+    const gameName = enteredName.trim() || defaultName;
+
+    try {
+      await saveGame({
+        name: gameName,
+        date: new Date().toISOString().slice(0, 10),
+        opponent: '',
+        location: '',
+        notes: ''
+      });
+      setActiveTab('games');
+      alert(`Saved "${gameName}". Opening Games tab.`);
+    } catch (error) {
+      console.error(error);
+      alert('Failed to save game. Please try again.');
+    }
+  };
+
   const allFieldPositions = [...POSITION_GROUPS.INFIELD, ...POSITION_GROUPS.OUTFIELD];
   const getPlayerPositionForInning = (playerId: string, inningNum: number) => {
     const inning = assignments.byInning[inningNum];
@@ -184,6 +218,7 @@ ${Array.from({ length: assignments.innings }, (_, i) => {
                 battingOrder={battingOrder} 
                 assignments={assignments}
                 onReorder={setBattingOrder} 
+                onSaveAsGame={handleSaveCurrentAsGame}
               />
             )}
             {activeTab === 'defense' && (
@@ -193,6 +228,7 @@ ${Array.from({ length: assignments.innings }, (_, i) => {
                 settings={settings} 
                 onUpdate={setAssignments} 
                 onGenerate={generateDefense}
+                onSaveAsGame={handleSaveCurrentAsGame}
                 selectedInning={selectedInning}
                 onSelectedInningChange={setSelectedInning}
               />
