@@ -1,5 +1,5 @@
-import React from 'react';
-import { Settings as SettingsIcon, ShieldCheck, Layout, Info } from 'lucide-react';
+import React, { useState } from 'react';
+import { Settings as SettingsIcon, ShieldCheck, Layout, Info, Plus, X } from 'lucide-react';
 import { Settings } from '../types';
 
 interface SettingsTabProps {
@@ -8,8 +8,27 @@ interface SettingsTabProps {
 }
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) => {
+  const [newRule, setNewRule] = useState('');
+
   const handleChange = (key: keyof Settings, value: any) => {
     onUpdate({ ...settings, [key]: value });
+  };
+
+  const addCustomRule = () => {
+    const trimmed = newRule.trim();
+    if (!trimmed) return;
+    const current = Array.isArray(settings.customRules) ? settings.customRules : [];
+    if (current.includes(trimmed)) {
+      setNewRule('');
+      return;
+    }
+    handleChange('customRules', [...current, trimmed]);
+    setNewRule('');
+  };
+
+  const removeCustomRule = (rule: string) => {
+    const current = Array.isArray(settings.customRules) ? settings.customRules : [];
+    handleChange('customRules', current.filter(r => r !== rule));
   };
 
   return (
@@ -195,6 +214,59 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
                 <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${settings.requireEarlyInfieldByInning3 ? 'left-7' : 'left-1'}`} />
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Additional Rules List */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 text-slate-800 font-bold border-b border-slate-50 pb-4">
+            <ShieldCheck size={18} className="text-indigo-500" />
+            Additional Rules List
+          </div>
+
+          <p className="text-xs text-slate-500">
+            Add plain-language rules (example: "No same position twice", "Max bench 1", "Infield by inning 3").
+            Supported patterns are enforced by auto-generate and validation.
+          </p>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newRule}
+              onChange={(e) => setNewRule(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addCustomRule();
+                }
+              }}
+              placeholder="Type a rule and press Enter"
+              className="flex-1 p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+            <button
+              onClick={addCustomRule}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700"
+            >
+              <Plus size={16} /> Add
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {(settings.customRules || []).length === 0 && (
+              <p className="text-sm text-slate-400">No additional rules yet.</p>
+            )}
+            {(settings.customRules || []).map((rule) => (
+              <div key={rule} className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+                <span className="text-sm text-slate-700">{rule}</span>
+                <button
+                  onClick={() => removeCustomRule(rule)}
+                  className="text-slate-400 hover:text-red-600"
+                  title="Remove rule"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
           </div>
         </div>
 

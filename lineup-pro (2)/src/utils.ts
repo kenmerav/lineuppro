@@ -4,11 +4,65 @@ import { POSITION_GROUPS, ALL_POSITIONS } from "./constants";
 export const isInfield = (pos: string) => POSITION_GROUPS.INFIELD.includes(pos);
 export const isOutfield = (pos: string) => POSITION_GROUPS.OUTFIELD.includes(pos);
 
+const parseRuleNumber = (rule: string) => {
+  const match = rule.match(/\b(\d+)\b/);
+  if (!match) return null;
+  const value = Number(match[1]);
+  if (!Number.isFinite(value)) return null;
+  return Math.max(1, Math.min(12, Math.floor(value)));
+};
+
+const applyCustomRuleText = (settings: Settings): Settings => {
+  const next: Settings = {
+    ...settings,
+    customRules: Array.isArray(settings.customRules) ? settings.customRules : []
+  };
+
+  for (const rawRule of next.customRules) {
+    const rule = rawRule.toLowerCase();
+    const num = parseRuleNumber(rule);
+
+    if (
+      rule.includes("no duplicate") ||
+      rule.includes("same position twice") ||
+      rule.includes("same position 2x")
+    ) {
+      next.preventDuplicatePositionInGame = true;
+    }
+
+    if (
+      rule.includes("infield") &&
+      (rule.includes("first 3") || rule.includes("inning 3") || rule.includes("by inning 3"))
+    ) {
+      next.requireEarlyInfieldByInning3 = true;
+    }
+
+    if (num && rule.includes("max") && rule.includes("bench")) {
+      next.maxConsecutiveBench = num;
+    }
+
+    if (num && rule.includes("max") && rule.includes("infield")) {
+      next.maxConsecutiveInfield = num;
+    }
+
+    if (num && rule.includes("max") && rule.includes("outfield")) {
+      next.maxConsecutiveOutfield = num;
+    }
+
+    if (rule.includes("no back-to-back") && rule.includes("position")) {
+      next.allowSamePositionBackToBack = false;
+    }
+  }
+
+  return next;
+};
+
 export const validateAll = (
   assignments: DefenseAssignments,
   players: Player[],
   settings: Settings
 ): ValidationResult => {
+  const effectiveSettings = applyCustomRuleText(settings);
   const errors: string[] = [];
   const warnings: string[] = [];
   const playerMap = new Map(players.map(p => [p.id, p]));
@@ -32,7 +86,7 @@ export const validateAll = (
         // Warning for unassigned positions
         if (isInfield(pos)) {
           errors.push(`Inning ${i}: ${pos} is unassigned.`);
-        } else if (!settings.allowEmptyOutfield) {
+        } else if (!effectiveSettings.allowEmptyOutfield) {
           errors.push(`Inning ${i}: ${pos} is unassigned.`);
         }
       }
@@ -53,7 +107,7 @@ export const validateAll = (
       }
     });
 
-    if (settings.requireDugout && players.length >= 10 && inning.dugout.length === 0) {
+    if (effectiveSettings.requireDugout && players.length >= 10 && inning.dugout.length === 0) {
       warnings.push(`Inning ${i}: No players are in the dugout despite roster size.`);
     }
 
@@ -69,7 +123,7 @@ export const validateAll = (
             if (prevInning[pos] === p.id) prevPos = pos;
           }
           if (currentPos && currentPos === prevPos) {
-            if (settings.allowSamePositionBackToBack) {
+            if (effectiveSettings.allowSamePositionBackToBack) {
               // No warning if allowed
             } else {
               errors.push(`Inning ${i}: ${p.name} is playing ${currentPos} back-to-back.`);
@@ -105,13 +159,13 @@ export const validateAll = (
       if (playedInfield) {
         infieldStreak++;
         outfieldStreak = 0;
-        if (infieldStreak > settings.maxConsecutiveInfield) {
+        if (infieldStreak > effectiveSettings.maxConsecutiveInfield) {
           errors.push(`${player.name} plays infield ${infieldStreak} innings in a row (Innings ${i-infieldStreak+1}–${i}).`);
         }
       } else if (playedOutfield) {
         outfieldStreak++;
         infieldStreak = 0;
-        if (outfieldStreak > settings.maxConsecutiveOutfield) {
+        if (outfieldStreak > effectiveSettings.maxConsecutiveOutfield) {
           errors.push(`${player.name} plays outfield ${outfieldStreak} innings in a row (Innings ${i-outfieldStreak+1}–${i}).`);
         }
       } else {
@@ -135,7 +189,7 @@ export const validateAll = (
     }
     positionsPlayed.forEach((count, pos) => {
       if (count > 1) {
-        if (settings.preventDuplicatePositionInGame) {
+        if (effectiveSettings.preventDuplicatePositionInGame) {
           errors.push(`${player.name} is playing ${pos} ${count} times in this game.`);
         } else {
           warnings.push(`${player.name} is playing ${pos} ${count} times in this game.`);
@@ -152,7 +206,7 @@ export const validateAll = (
       const onBench = (inning?.dugout || []).includes(player.id);
       if (onBench) {
         benchStreak++;
-        if (benchStreak > settings.maxConsecutiveBench) {
+        if (benchStreak > effectiveSettings.maxConsecutiveBench) {
           errors.push(`${player.name} sits ${benchStreak} innings in a row (Innings ${i-benchStreak+1}–${i}).`);
         }
       } else {
@@ -162,7 +216,7 @@ export const validateAll = (
   });
 
   // 5. Hard Rule: Everyone gets infield by inning 3 when mathematically possible.
-  if (settings.requireEarlyInfieldByInning3) {
+  if (effectiveSettings.requireEarlyInfieldByInning3) {
     const firstThreeInnings = Math.min(3, assignments.innings);
     const earlyInfieldSlots = firstThreeInnings * POSITION_GROUPS.INFIELD.length;
     if (players.length <= earlyInfieldSlots) {
@@ -348,6 +402,7 @@ export const autoGenerateDefense = (
   settings: Settings,
   savedGames: SavedGame[] = []
 ): DefenseAssignments => {
+  const effectiveSettings = applyCustomRuleText(settings);
   const createEmptyAssignments = (): DefenseAssignments => {
     const empty: DefenseAssignments = { innings: inningsCount, byInning: {} };
     for (let i = 1; i <= inningsCount; i++) empty.byInning[i] = { dugout: [] };
@@ -374,7 +429,7 @@ export const autoGenerateDefense = (
   });
 
   const firstThreeInnings = Math.min(3, inningsCount);
-  const enforceEarlyInfield = settings.requireEarlyInfieldByInning3;
+  const enforceEarlyInfield = effectiveSettings.requireEarlyInfieldByInning3;
   const minimumMissingEarlyInfield = enforceEarlyInfield
     ? Math.max(0, players.length - (firstThreeInnings * POSITION_GROUPS.INFIELD.length))
     : players.length;
@@ -424,10 +479,11 @@ export const autoGenerateDefense = (
         const isPosOutfield = isOutfield(pos);
         const hardCandidates = orderedPlayers.filter((p) => {
           if (assignedThisInning.has(p.id)) return false;
-          if (isPosInfield && (playerLastInfieldStreak.get(p.id) || 0) >= settings.maxConsecutiveInfield) return false;
-          if (isPosOutfield && (playerLastOutfieldStreak.get(p.id) || 0) >= settings.maxConsecutiveOutfield) return false;
-          if (!settings.allowSamePositionBackToBack && playerLastPosition.get(p.id) === pos) return false;
-          if (settings.preventDuplicatePositionInGame && playerPositionsPlayed.get(p.id)?.has(pos)) return false;
+          if (isPosInfield && (playerLastInfieldStreak.get(p.id) || 0) >= effectiveSettings.maxConsecutiveInfield) return false;
+          if (isPosOutfield && (playerLastOutfieldStreak.get(p.id) || 0) >= effectiveSettings.maxConsecutiveOutfield) return false;
+          if (!effectiveSettings.allowSamePositionBackToBack && playerLastPosition.get(p.id) === pos) return false;
+          // Never allow the same exact position twice in a game.
+          if (playerPositionsPlayed.get(p.id)?.has(pos)) return false;
           return true;
         });
 
@@ -442,7 +498,7 @@ export const autoGenerateDefense = (
 
           if (isPosInfield && needsEarlyInfield) score -= 1000;
           if (!isPosInfield && needsEarlyInfield) score += 300;
-          if (benchStreak >= settings.maxConsecutiveBench) score -= 1200;
+          if (benchStreak >= effectiveSettings.maxConsecutiveBench) score -= 1200;
           score += alreadyPlayedPos * 35;
           score += inHistory * 20;
           score += infieldCount * 4;
@@ -457,7 +513,7 @@ export const autoGenerateDefense = (
       const assignPosition = (idx: number): boolean => {
         if (idx >= positionsThisInning.length) return true;
         const pos = positionsThisInning[idx];
-        const isRequired = isInfield(pos) || !settings.allowEmptyOutfield;
+        const isRequired = isInfield(pos) || !effectiveSettings.allowEmptyOutfield;
         const candidates = chooseCandidates(pos);
 
         for (const candidate of candidates) {

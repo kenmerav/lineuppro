@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS = {
   maxConsecutiveOutfield: 2,
   maxConsecutiveBench: 2,
   allowSamePositionBackToBack: false,
-  preventDuplicatePositionInGame: false,
+  preventDuplicatePositionInGame: true,
   requireEarlyInfieldByInning3: true,
+  customRules: [] as string[],
 };

@@ -24,6 +24,7 @@ type Settings = {
   allowSamePositionBackToBack: boolean;
   preventDuplicatePositionInGame: boolean;
   requireEarlyInfieldByInning3: boolean;
+  customRules: string[];
 };
 type Team = {
   id: string;
@@ -133,8 +134,9 @@ const DEFAULT_SETTINGS: Settings = {
   maxConsecutiveOutfield: 2,
   maxConsecutiveBench: 2,
   allowSamePositionBackToBack: false,
-  preventDuplicatePositionInGame: false,
+  preventDuplicatePositionInGame: true,
   requireEarlyInfieldByInning3: true,
+  customRules: [],
 };
 
 const users = new Map<string, User>();

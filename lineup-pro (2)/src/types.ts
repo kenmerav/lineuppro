@@ -36,6 +36,7 @@ export interface Settings {
   allowSamePositionBackToBack: boolean;
   preventDuplicatePositionInGame: boolean;
   requireEarlyInfieldByInning3: boolean;
+  customRules: string[];
 }
 
 export interface GameMeta {
