@@ -333,6 +333,36 @@ app.post("/api/teams/:teamId/games", auth, async (req: AuthedRequest, res) => {
   return res.status(201).json({ id: game.id });
 });
 
+app.put("/api/teams/:teamId/games/:gameId", auth, async (req: AuthedRequest, res) => {
+  const team = teamFor(req, req.params.teamId);
+  if (!team) return res.status(404).json({ error: "Team not found" });
+
+  const games = gamesByTeam.get(team.id) || [];
+  const gameIndex = games.findIndex((g) => g.id === req.params.gameId);
+  if (gameIndex === -1) return res.status(404).json({ error: "Game not found" });
+
+  const existing = games[gameIndex];
+  const updated: SavedGame = {
+    ...existing,
+    meta: req.body?.meta || existing.meta,
+    players: Array.isArray(req.body?.players) ? req.body.players : existing.players,
+    battingOrder: Array.isArray(req.body?.battingOrder)
+      ? req.body.battingOrder
+      : Array.isArray(req.body?.batting_order)
+        ? req.body.batting_order
+        : existing.battingOrder,
+    assignments: req.body?.assignments || existing.assignments,
+    settings: req.body?.settings || existing.settings,
+    branding: req.body?.branding || existing.branding,
+    log: req.body?.log ?? existing.log,
+  };
+
+  games[gameIndex] = updated;
+  gamesByTeam.set(team.id, games);
+  await persistStore();
+  return res.json(updated);
+});
+
 app.delete("/api/teams/:teamId/games/:gameId", auth, async (req: AuthedRequest, res) => {
   const team = teamFor(req, req.params.teamId);
   if (!team) return res.status(404).json({ error: "Team not found" });

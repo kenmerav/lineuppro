@@ -28,10 +28,10 @@ export const TeamView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('roster');
   const [selectedInning, setSelectedInning] = useState(1);
   const {
-    players, battingOrder, assignments, settings, branding, savedGames, gameLog, loading,
-    setBattingOrder, setAssignments, setSettings, setBranding, setSavedGames, setGameLog,
+    players, battingOrder, assignments, settings, branding, savedGames, gameLog, loading, activeGameId,
+    setBattingOrder, setAssignments, setSettings, setBranding, setGameLog,
     addPlayer, bulkAddPlayers, updatePlayer, deletePlayer,
-    saveGame, loadGame, generateDefense,
+    saveGame, updateGame, loadGame, deleteGame, importGame, generateDefense,
     saveAsMasterRoster, loadMasterRoster, startNewGame
   } = useAppState(teamId);
 
@@ -218,10 +218,12 @@ ${Array.from({ length: assignments.innings }, (_, i) => {
               <GamesTab 
                 savedGames={savedGames} 
                 onSave={saveGame} 
+                onUpdate={updateGame}
                 onLoad={loadGame} 
-                onDelete={(id) => setSavedGames(prev => prev.filter(g => g.id !== id))} 
-                onImport={(game) => setSavedGames(prev => [...prev, game])}
+                onDelete={deleteGame}
+                onImport={importGame}
                 onNewGame={startNewGame}
+                activeGameId={activeGameId}
               />
             )}
             {activeTab === 'settings' && (

@@ -221,41 +221,109 @@ export function useAppState(teamId?: string) {
     });
   }, []);
 
+  const buildGamePayload = useCallback((meta: SavedGame["meta"]) => ({
+    meta,
+    players,
+    batting_order: battingOrder,
+    assignments,
+    settings,
+    branding,
+    log: gameLog
+  }), [players, battingOrder, assignments, settings, branding, gameLog]);
+
   const saveGame = useCallback(async (meta: SavedGame["meta"]) => {
-    if (!teamId) return;
-    const newGameData = {
+    if (!teamId) {
+      throw new Error("Team is required to save games.");
+    }
+
+    const res = await fetch(`/api/teams/${teamId}/games`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildGamePayload(meta))
+    });
+    if (!res.ok) {
+      throw new Error("Failed to save game.");
+    }
+
+    const { id } = await res.json();
+    const newGame: SavedGame = {
+      id,
       meta,
       players,
-      batting_order: battingOrder,
+      battingOrder,
       assignments,
+      settings,
+      branding,
       log: gameLog
     };
+    setSavedGames(prev => [...prev, newGame]);
+    setActiveGameId(id);
+    return newGame;
+  }, [teamId, buildGamePayload, players, battingOrder, assignments, settings, branding, gameLog]);
 
-    try {
-      const res = await fetch(`/api/teams/${teamId}/games`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newGameData)
-      });
-      if (res.ok) {
-        const { id } = await res.json();
-        const newGame: SavedGame = {
-          id,
-          meta,
-          players,
-          battingOrder,
-          assignments,
-          settings,
-          branding,
-          log: gameLog
-        };
-        setSavedGames(prev => [...prev, newGame]);
-        setGameLog(undefined);
-      }
-    } catch (e) {
-      console.error("Failed to save game", e);
+  const updateGame = useCallback(async (gameId: string, meta: SavedGame["meta"]) => {
+    if (!teamId) {
+      throw new Error("Team is required to update games.");
     }
-  }, [teamId, players, battingOrder, assignments, settings, branding, gameLog]);
+
+    const res = await fetch(`/api/teams/${teamId}/games/${gameId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildGamePayload(meta))
+    });
+    if (!res.ok) {
+      throw new Error("Failed to update game.");
+    }
+
+    const updated = await res.json() as SavedGame;
+    setSavedGames(prev => prev.map(g => g.id === gameId ? updated : g));
+    setActiveGameId(updated.id);
+    return updated;
+  }, [teamId, buildGamePayload]);
+
+  const deleteGame = useCallback(async (id: string) => {
+    if (!teamId) {
+      throw new Error("Team is required to delete games.");
+    }
+
+    const res = await fetch(`/api/teams/${teamId}/games/${id}`, {
+      method: "DELETE"
+    });
+    if (!res.ok) {
+      throw new Error("Failed to delete game.");
+    }
+
+    setSavedGames(prev => prev.filter(g => g.id !== id));
+    setActiveGameId(prev => prev === id ? null : prev);
+  }, [teamId]);
+
+  const importGame = useCallback(async (game: SavedGame) => {
+    if (!teamId) {
+      throw new Error("Team is required to import games.");
+    }
+
+    const res = await fetch(`/api/teams/${teamId}/games`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        meta: game.meta,
+        players: game.players,
+        batting_order: game.battingOrder,
+        assignments: game.assignments,
+        settings: game.settings,
+        branding: game.branding,
+        log: game.log
+      })
+    });
+    if (!res.ok) {
+      throw new Error("Failed to import game.");
+    }
+
+    const { id } = await res.json();
+    const imported = { ...game, id };
+    setSavedGames(prev => [...prev, imported]);
+    return imported;
+  }, [teamId]);
 
   const loadGame = useCallback((game: SavedGame) => {
     setPlayers(game.players);
@@ -286,8 +354,9 @@ export function useAppState(teamId?: string) {
     savedGames, setSavedGames,
     gameLog, setGameLog,
     loading,
+    activeGameId,
     addPlayer, bulkAddPlayers, updatePlayer, deletePlayer,
-    saveGame, loadGame, generateDefense,
+    saveGame, updateGame, loadGame, deleteGame, importGame, generateDefense,
     saveAsMasterRoster, loadMasterRoster, startNewGame
   };
 }
