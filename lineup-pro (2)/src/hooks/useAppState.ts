@@ -19,6 +19,10 @@ export function useAppState(teamId?: string) {
   const [loading, setLoading] = useState(!!teamId);
   const [hasHydratedTeam, setHasHydratedTeam] = useState(!teamId);
 
+  useEffect(() => {
+    setHasHydratedTeam(!teamId);
+  }, [teamId]);
+
   // Fetch team data
   useEffect(() => {
     if (!teamId) return;
@@ -41,6 +45,26 @@ export function useAppState(teamId?: string) {
         const gamesRes = await fetch(`/api/teams/${teamId}/games`);
         const games = await gamesRes.json();
         setSavedGames(games);
+
+        // Load saved working draft (lineup + defense) so game-day setup isn't lost.
+        const draftRes = await fetch(`/api/teams/${teamId}/draft`);
+        if (draftRes.ok) {
+          const draft = await draftRes.json();
+          if (draft) {
+            if (Array.isArray(draft.players) && draft.players.length > 0) {
+              setPlayers(draft.players);
+            }
+            if (Array.isArray(draft.battingOrder) && draft.battingOrder.length > 0) {
+              setBattingOrder(draft.battingOrder);
+            }
+            if (draft.assignments) {
+              setAssignments(draft.assignments);
+            }
+            if (draft.log) {
+              setGameLog(draft.log);
+            }
+          }
+        }
       } catch (e) {
         console.error("Failed to load team", e);
       } finally {
@@ -83,6 +107,34 @@ export function useAppState(teamId?: string) {
     if (!teamId || !hasHydratedTeam) return;
     saveTeamState();
   }, [teamId, hasHydratedTeam, masterRoster, settings, branding, saveTeamState]);
+
+  const saveDraftState = useCallback(async () => {
+    if (!teamId) return;
+    try {
+      await fetch(`/api/teams/${teamId}/draft`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          players,
+          battingOrder,
+          assignments,
+          settings,
+          branding,
+          log: gameLog
+        })
+      });
+    } catch (e) {
+      console.error("Failed to save working draft", e);
+    }
+  }, [teamId, players, battingOrder, assignments, settings, branding, gameLog]);
+
+  useEffect(() => {
+    if (!teamId || !hasHydratedTeam) return;
+    const timer = setTimeout(() => {
+      saveDraftState();
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [teamId, hasHydratedTeam, players, battingOrder, assignments, settings, branding, gameLog, saveDraftState]);
 
   const loadMasterRoster = useCallback(() => {
     if (masterRoster.length > 0) {

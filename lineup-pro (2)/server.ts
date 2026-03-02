@@ -41,6 +41,17 @@ type SavedGame = {
   branding: TeamBranding;
   log?: Record<string, unknown>;
 };
+type DraftGameState = {
+  teamId: string;
+  ownerId: string;
+  players: Player[];
+  battingOrder: string[];
+  assignments: Record<string, unknown>;
+  settings: Settings;
+  branding: TeamBranding;
+  log?: Record<string, unknown>;
+  updatedAt: string;
+};
 type User = {
   id: string;
   name: string;
@@ -52,6 +63,7 @@ type PersistedStore = {
   users: User[];
   teams: Team[];
   gamesByTeam: Record<string, SavedGame[]>;
+  draftsByTeam: Record<string, DraftGameState>;
 };
 
 const app = express();
@@ -77,6 +89,7 @@ const DEFAULT_SETTINGS: Settings = {
 const users = new Map<string, User>();
 const teams = new Map<string, Team>();
 const gamesByTeam = new Map<string, SavedGame[]>();
+const draftsByTeam = new Map<string, DraftGameState>();
 let persistChain: Promise<void> = Promise.resolve();
 
 async function loadStore() {
@@ -86,11 +99,15 @@ async function loadStore() {
     users.clear();
     teams.clear();
     gamesByTeam.clear();
+    draftsByTeam.clear();
 
     for (const user of parsed.users || []) users.set(user.id, user);
     for (const team of parsed.teams || []) teams.set(team.id, team);
     for (const [teamId, games] of Object.entries(parsed.gamesByTeam || {})) {
       gamesByTeam.set(teamId, games || []);
+    }
+    for (const [teamId, draft] of Object.entries(parsed.draftsByTeam || {})) {
+      if (draft) draftsByTeam.set(teamId, draft);
     }
   } catch (error: any) {
     if (error?.code !== "ENOENT") {
@@ -105,6 +122,7 @@ function persistStore() {
       users: [...users.values()],
       teams: [...teams.values()],
       gamesByTeam: Object.fromEntries(gamesByTeam.entries()),
+      draftsByTeam: Object.fromEntries(draftsByTeam.entries()),
     };
     await fs.mkdir(DATA_DIR, { recursive: true });
     await fs.writeFile(STORE_FILE, JSON.stringify(data, null, 2), "utf-8");
@@ -254,6 +272,37 @@ app.get("/api/teams/:teamId/games", auth, (req: AuthedRequest, res) => {
   const team = teamFor(req, req.params.teamId);
   if (!team) return res.status(404).json({ error: "Team not found" });
   return res.json(gamesByTeam.get(team.id) || []);
+});
+
+app.get("/api/teams/:teamId/draft", auth, (req: AuthedRequest, res) => {
+  const team = teamFor(req, req.params.teamId);
+  if (!team) return res.status(404).json({ error: "Team not found" });
+  return res.json(draftsByTeam.get(team.id) || null);
+});
+
+app.put("/api/teams/:teamId/draft", auth, async (req: AuthedRequest, res) => {
+  const team = teamFor(req, req.params.teamId);
+  if (!team) return res.status(404).json({ error: "Team not found" });
+
+  const draft: DraftGameState = {
+    teamId: team.id,
+    ownerId: req.userId!,
+    players: Array.isArray(req.body?.players) ? req.body.players : [],
+    battingOrder: Array.isArray(req.body?.battingOrder)
+      ? req.body.battingOrder
+      : Array.isArray(req.body?.batting_order)
+        ? req.body.batting_order
+        : [],
+    assignments: req.body?.assignments || { innings: team.settings.inningsCount, byInning: {} },
+    settings: req.body?.settings || team.settings,
+    branding: req.body?.branding || team.branding,
+    log: req.body?.log,
+    updatedAt: new Date().toISOString(),
+  };
+
+  draftsByTeam.set(team.id, draft);
+  await persistStore();
+  return res.json({ ok: true, updatedAt: draft.updatedAt });
 });
 
 app.post("/api/teams/:teamId/games", auth, async (req: AuthedRequest, res) => {
