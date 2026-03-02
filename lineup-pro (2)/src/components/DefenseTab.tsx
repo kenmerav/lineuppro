@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Shield, AlertCircle, CheckCircle2, RefreshCw, Trash2, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
-import { Player, DefenseAssignments, Settings, Position } from '../types';
+import { Shield, AlertCircle, CheckCircle2, RefreshCw, Trash2, ChevronLeft, ChevronRight, UserPlus, LayoutGrid, Map as MapIcon } from 'lucide-react';
+import { Player, DefenseAssignments, Settings } from '../types';
 import { POSITION_GROUPS, ALL_POSITIONS } from '../constants';
-import { validateAll, isInfield, isOutfield, autoFixViolations } from '../utils';
+import { validateAll, autoFixViolations } from '../utils';
 import { cn, getContrastColor } from '../lib/utils';
+import { DefensiveFieldDiagram } from './DefensiveFieldDiagram';
 
 interface DefenseTabProps {
   players: Player[];
@@ -11,10 +12,21 @@ interface DefenseTabProps {
   settings: Settings;
   onUpdate: (assignments: DefenseAssignments) => void;
   onGenerate: () => void;
+  selectedInning: number;
+  onSelectedInningChange: (inning: number) => void;
 }
 
-export const DefenseTab: React.FC<DefenseTabProps> = ({ players, assignments, settings, onUpdate, onGenerate }) => {
+export const DefenseTab: React.FC<DefenseTabProps> = ({
+  players,
+  assignments,
+  settings,
+  onUpdate,
+  onGenerate,
+  selectedInning,
+  onSelectedInningChange
+}) => {
   const [selectedCell, setSelectedCell] = useState<{ inning: number; pos: string } | null>(null);
+  const [viewMode, setViewMode] = useState<'table' | 'field'>('table');
   const validation = useMemo(() => validateAll(assignments, players, settings), [assignments, players, settings]);
 
   const handleAssign = (playerId: string | null) => {
@@ -77,14 +89,6 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({ players, assignments, se
     nextAssignments.byInning[inningNum] = inning;
     onUpdate(nextAssignments);
     setSelectedCell(null);
-  };
-
-  const removeFromDugout = (inningNum: number, playerId: string) => {
-    const nextAssignments = { ...assignments };
-    const inning = { ...nextAssignments.byInning[inningNum] };
-    inning.dugout = inning.dugout.filter(id => id !== playerId);
-    nextAssignments.byInning[inningNum] = inning;
-    onUpdate(nextAssignments);
   };
 
   const playerMap = new Map<string, Player>(players.map(p => [p.id, p]));
@@ -150,143 +154,201 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({ players, assignments, se
         </div>
       )}
 
-      {/* Rotation Grid */}
-      <div className="min-w-[800px]">
-        <table className="w-full border-separate border-spacing-1">
-          <thead>
-            <tr>
-              <th className="w-24 p-2 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Position</th>
-              {Array.from({ length: assignments.innings }, (_, i) => (
-                <th key={i} className="p-2 text-center text-sm font-bold text-slate-700 bg-slate-100 rounded-lg">
-                  Inning {i + 1}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {/* Infield Group */}
-            <tr>
-              <td colSpan={assignments.innings + 1} className="py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Infield</td>
-            </tr>
-            {POSITION_GROUPS.INFIELD.map(pos => (
-              <tr key={pos}>
-                <td className="p-2 font-bold text-slate-600 text-sm">{pos}</td>
-                {Array.from({ length: assignments.innings }, (_, i) => {
-                  const inningNum = i + 1;
-                  const playerId = assignments.byInning[inningNum]?.[pos];
-                  const player = playerId ? playerMap.get(playerId) : null;
-                  const isAbsent = player?.active === false;
-                  return (
-                    <td key={i} className="p-0">
-                      <button
-                        onClick={() => setSelectedCell({ inning: inningNum, pos })}
-                        className={cn(
-                          "w-full h-12 rounded-lg border-2 transition-all flex items-center justify-center font-bold text-sm relative",
-                          player ? "border-transparent" : "border-dashed border-slate-200 text-slate-300 hover:border-slate-300",
-                          selectedCell?.inning === inningNum && selectedCell?.pos === pos ? "ring-2 ring-indigo-500 ring-offset-2" : "",
-                          isAbsent ? "opacity-40 grayscale" : ""
-                        )}
-                        style={player ? { backgroundColor: player.color, color: getContrastColor(player.color) } : {}}
-                      >
-                        {player?.name || "+"}
-                        {isAbsent && (
-                          <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm" title="Player is Absent">
-                            <X size={10} strokeWidth={4} />
-                          </div>
-                        )}
-                      </button>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1">
+          <button
+            onClick={() => setViewMode('table')}
+            className={cn(
+              "px-3 py-2 rounded-lg text-sm font-semibold inline-flex items-center gap-2 transition-colors",
+              viewMode === 'table' ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100"
+            )}
+          >
+            <LayoutGrid size={16} />
+            Table View
+          </button>
+          <button
+            onClick={() => setViewMode('field')}
+            className={cn(
+              "px-3 py-2 rounded-lg text-sm font-semibold inline-flex items-center gap-2 transition-colors",
+              viewMode === 'field' ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100"
+            )}
+          >
+            <MapIcon size={16} />
+            Field View
+          </button>
+        </div>
 
-            {/* Outfield Group */}
-            <tr>
-              <td colSpan={assignments.innings + 1} className="py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Outfield</td>
-            </tr>
-            {POSITION_GROUPS.OUTFIELD.map(pos => (
-              <tr key={pos}>
-                <td className="p-2 font-bold text-slate-600 text-sm">{pos}</td>
-                {Array.from({ length: assignments.innings }, (_, i) => {
-                  const inningNum = i + 1;
-                  const playerId = assignments.byInning[inningNum]?.[pos];
-                  const player = playerId ? playerMap.get(playerId) : null;
-                  const isAbsent = player?.active === false;
-                  return (
-                    <td key={i} className="p-0">
-                      <button
-                        onClick={() => setSelectedCell({ inning: inningNum, pos })}
-                        className={cn(
-                          "w-full h-12 rounded-lg border-2 transition-all flex items-center justify-center font-bold text-sm relative",
-                          player ? "border-transparent" : "border-dashed border-slate-200 text-slate-300 hover:border-slate-300",
-                          selectedCell?.inning === inningNum && selectedCell?.pos === pos ? "ring-2 ring-indigo-500 ring-offset-2" : "",
-                          isAbsent ? "opacity-40 grayscale" : ""
-                        )}
-                        style={player ? { backgroundColor: player.color, color: getContrastColor(player.color) } : {}}
-                      >
-                        {player?.name || "+"}
-                        {isAbsent && (
-                          <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm" title="Player is Absent">
-                            <X size={10} strokeWidth={4} />
-                          </div>
-                        )}
-                      </button>
-                    </td>
-                  );
-                })}
-              </tr>
+        <div className="inline-flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1">
+          <button
+            onClick={() => onSelectedInningChange(Math.max(1, selectedInning - 1))}
+            className="h-9 w-9 rounded-lg hover:bg-slate-100 text-slate-600 flex items-center justify-center"
+            title="Previous inning"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <select
+            value={selectedInning}
+            onChange={(e) => onSelectedInningChange(Number(e.target.value))}
+            className="h-9 bg-transparent text-sm font-semibold text-slate-700 px-2 outline-none"
+          >
+            {Array.from({ length: assignments.innings }, (_, i) => i + 1).map((inning) => (
+              <option key={inning} value={inning}>
+                Inning {inning}
+              </option>
             ))}
-
-            {/* Dugout Group */}
-            <tr>
-              <td colSpan={assignments.innings + 1} className="py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Dugout</td>
-            </tr>
-            <tr>
-              <td className="p-2 font-bold text-slate-600 text-sm">Bench</td>
-              {Array.from({ length: assignments.innings }, (_, i) => {
-                const inningNum = i + 1;
-                const dugout = assignments.byInning[inningNum]?.dugout || [];
-                return (
-                  <td key={i} className="p-1 align-top">
-                    <div className="min-h-[60px] p-2 bg-slate-50 rounded-xl border border-slate-100 flex flex-wrap gap-1">
-                      {dugout.map(pid => {
-                        const p = playerMap.get(pid);
-                        if (!p) return null;
-                        const isAbsent = p.active === false;
-                        return (
-                          <div 
-                            key={pid}
-                            className={cn(
-                              "px-2 py-1 rounded-md text-[10px] font-bold shadow-sm cursor-pointer hover:scale-105 transition-transform relative",
-                              isAbsent ? "opacity-40 grayscale" : ""
-                            )}
-                            style={{ backgroundColor: p.color, color: getContrastColor(p.color) }}
-                            onClick={() => setSelectedCell({ inning: inningNum, pos: 'dugout' })}
-                          >
-                            {p.name}
-                            {isAbsent && (
-                              <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm">
-                                <X size={8} strokeWidth={4} />
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                      <button 
-                        onClick={() => setSelectedCell({ inning: inningNum, pos: 'dugout' })}
-                        className="w-6 h-6 rounded-md border border-dashed border-slate-300 text-slate-400 flex items-center justify-center hover:bg-white transition-colors"
-                      >
-                        <UserPlus size={12} />
-                      </button>
-                    </div>
-                  </td>
-                );
-              })}
-            </tr>
-          </tbody>
-        </table>
+          </select>
+          <button
+            onClick={() => onSelectedInningChange(Math.min(assignments.innings, selectedInning + 1))}
+            className="h-9 w-9 rounded-lg hover:bg-slate-100 text-slate-600 flex items-center justify-center"
+            title="Next inning"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
       </div>
+
+      {viewMode === 'field' ? (
+        <DefensiveFieldDiagram
+          assignments={assignments}
+          players={players}
+          inning={selectedInning}
+          title={`Field View - Inning ${selectedInning}`}
+        />
+      ) : (
+        <div className="min-w-[800px]">
+          <table className="w-full border-separate border-spacing-1">
+            <thead>
+              <tr>
+                <th className="w-24 p-2 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Position</th>
+                {Array.from({ length: assignments.innings }, (_, i) => (
+                  <th key={i} className="p-2 text-center text-sm font-bold text-slate-700 bg-slate-100 rounded-lg">
+                    Inning {i + 1}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colSpan={assignments.innings + 1} className="py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Infield</td>
+              </tr>
+              {POSITION_GROUPS.INFIELD.map(pos => (
+                <tr key={pos}>
+                  <td className="p-2 font-bold text-slate-600 text-sm">{pos}</td>
+                  {Array.from({ length: assignments.innings }, (_, i) => {
+                    const inningNum = i + 1;
+                    const playerId = assignments.byInning[inningNum]?.[pos];
+                    const player = playerId ? playerMap.get(playerId) : null;
+                    const isAbsent = player?.active === false;
+                    return (
+                      <td key={i} className="p-0">
+                        <button
+                          onClick={() => setSelectedCell({ inning: inningNum, pos })}
+                          className={cn(
+                            "w-full h-12 rounded-lg border-2 transition-all flex items-center justify-center font-bold text-sm relative",
+                            player ? "border-transparent" : "border-dashed border-slate-200 text-slate-300 hover:border-slate-300",
+                            selectedCell?.inning === inningNum && selectedCell?.pos === pos ? "ring-2 ring-indigo-500 ring-offset-2" : "",
+                            isAbsent ? "opacity-40 grayscale" : ""
+                          )}
+                          style={player ? { backgroundColor: player.color, color: getContrastColor(player.color) } : {}}
+                        >
+                          {player?.name || "+"}
+                          {isAbsent && (
+                            <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm" title="Player is Absent">
+                              <X size={10} strokeWidth={4} />
+                            </div>
+                          )}
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+
+              <tr>
+                <td colSpan={assignments.innings + 1} className="py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Outfield</td>
+              </tr>
+              {POSITION_GROUPS.OUTFIELD.map(pos => (
+                <tr key={pos}>
+                  <td className="p-2 font-bold text-slate-600 text-sm">{pos}</td>
+                  {Array.from({ length: assignments.innings }, (_, i) => {
+                    const inningNum = i + 1;
+                    const playerId = assignments.byInning[inningNum]?.[pos];
+                    const player = playerId ? playerMap.get(playerId) : null;
+                    const isAbsent = player?.active === false;
+                    return (
+                      <td key={i} className="p-0">
+                        <button
+                          onClick={() => setSelectedCell({ inning: inningNum, pos })}
+                          className={cn(
+                            "w-full h-12 rounded-lg border-2 transition-all flex items-center justify-center font-bold text-sm relative",
+                            player ? "border-transparent" : "border-dashed border-slate-200 text-slate-300 hover:border-slate-300",
+                            selectedCell?.inning === inningNum && selectedCell?.pos === pos ? "ring-2 ring-indigo-500 ring-offset-2" : "",
+                            isAbsent ? "opacity-40 grayscale" : ""
+                          )}
+                          style={player ? { backgroundColor: player.color, color: getContrastColor(player.color) } : {}}
+                        >
+                          {player?.name || "+"}
+                          {isAbsent && (
+                            <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm" title="Player is Absent">
+                              <X size={10} strokeWidth={4} />
+                            </div>
+                          )}
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+
+              <tr>
+                <td colSpan={assignments.innings + 1} className="py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Dugout</td>
+              </tr>
+              <tr>
+                <td className="p-2 font-bold text-slate-600 text-sm">Bench</td>
+                {Array.from({ length: assignments.innings }, (_, i) => {
+                  const inningNum = i + 1;
+                  const dugout = assignments.byInning[inningNum]?.dugout || [];
+                  return (
+                    <td key={i} className="p-1 align-top">
+                      <div className="min-h-[60px] p-2 bg-slate-50 rounded-xl border border-slate-100 flex flex-wrap gap-1">
+                        {dugout.map(pid => {
+                          const p = playerMap.get(pid);
+                          if (!p) return null;
+                          const isAbsent = p.active === false;
+                          return (
+                            <div
+                              key={pid}
+                              className={cn(
+                                "px-2 py-1 rounded-md text-[10px] font-bold shadow-sm cursor-pointer hover:scale-105 transition-transform relative",
+                                isAbsent ? "opacity-40 grayscale" : ""
+                              )}
+                              style={{ backgroundColor: p.color, color: getContrastColor(p.color) }}
+                              onClick={() => setSelectedCell({ inning: inningNum, pos: 'dugout' })}
+                            >
+                              {p.name}
+                              {isAbsent && (
+                                <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm">
+                                  <X size={8} strokeWidth={4} />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        <button
+                          onClick={() => setSelectedCell({ inning: inningNum, pos: 'dugout' })}
+                          className="w-6 h-6 rounded-md border border-dashed border-slate-300 text-slate-400 flex items-center justify-center hover:bg-white transition-colors"
+                        >
+                          <UserPlus size={12} />
+                        </button>
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Player Selector Modal */}
       {selectedCell && (

@@ -17,6 +17,7 @@ export function useAppState(teamId?: string) {
   const [masterRoster, setMasterRoster] = useState<Player[]>([]);
   const [gameLog, setGameLog] = useState<GameLog | undefined>(undefined);
   const [loading, setLoading] = useState(!!teamId);
+  const [hasHydratedTeam, setHasHydratedTeam] = useState(!teamId);
 
   // Fetch team data
   useEffect(() => {
@@ -44,6 +45,7 @@ export function useAppState(teamId?: string) {
         console.error("Failed to load team", e);
       } finally {
         setLoading(false);
+        setHasHydratedTeam(true);
       }
     };
 
@@ -78,8 +80,9 @@ export function useAppState(teamId?: string) {
   }, [players]);
 
   useEffect(() => {
-    if (teamId) saveTeamState();
-  }, [masterRoster, settings, branding]);
+    if (!teamId || !hasHydratedTeam) return;
+    saveTeamState();
+  }, [teamId, hasHydratedTeam, masterRoster, settings, branding, saveTeamState]);
 
   const loadMasterRoster = useCallback(() => {
     if (masterRoster.length > 0) {
@@ -109,6 +112,7 @@ export function useAppState(teamId?: string) {
       active: true
     };
     setPlayers(prev => [...prev, newPlayer]);
+    setMasterRoster(prev => [...prev, newPlayer]);
     setBattingOrder(prev => [...prev, newPlayer.id]);
   }, [players.length]);
 
@@ -121,11 +125,16 @@ export function useAppState(teamId?: string) {
       active: true
     }));
     setPlayers(prev => [...prev, ...newPlayers]);
+    setMasterRoster(prev => [...prev, ...newPlayers]);
     setBattingOrder(prev => [...prev, ...newPlayers.map(p => p.id)]);
   }, [players.length]);
 
   const updatePlayer = useCallback((id: string, updates: Partial<Player>) => {
     setPlayers(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+    const { active, ...rosterUpdates } = updates;
+    if (Object.keys(rosterUpdates).length > 0) {
+      setMasterRoster(prev => prev.map(p => p.id === id ? { ...p, ...rosterUpdates } : p));
+    }
     
     if (updates.active !== undefined) {
       setGameLog(prev => {
@@ -144,6 +153,7 @@ export function useAppState(teamId?: string) {
 
   const deletePlayer = useCallback((id: string) => {
     setPlayers(prev => prev.filter(p => p.id !== id));
+    setMasterRoster(prev => prev.filter(p => p.id !== id));
     setBattingOrder(prev => prev.filter(pid => pid !== id));
     setAssignments(prev => {
       const next = { ...prev };

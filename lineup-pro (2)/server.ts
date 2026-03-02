@@ -48,11 +48,21 @@ type User = {
   passwordHash: string;
 };
 type AuthedRequest = Request & { userId?: string };
+type PersistedStore = {
+  users: User[];
+  teams: Team[];
+  gamesByTeam: Record<string, SavedGame[]>;
+};
 
 const app = express();
 const PORT = Number(process.env.PORT || 5173);
 const JWT_SECRET = process.env.JWT_SECRET || "dev-only-secret-change-me";
 const TOKEN_COOKIE = "lineup_pro_token";
+const IS_PROD = process.env.NODE_ENV === "production";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DATA_DIR = path.resolve(__dirname, "data");
+const STORE_FILE = path.resolve(DATA_DIR, "store.json");
 
 const DEFAULT_SETTINGS: Settings = {
   inningsCount: 5,
@@ -67,6 +77,45 @@ const DEFAULT_SETTINGS: Settings = {
 const users = new Map<string, User>();
 const teams = new Map<string, Team>();
 const gamesByTeam = new Map<string, SavedGame[]>();
+let persistChain: Promise<void> = Promise.resolve();
+
+async function loadStore() {
+  try {
+    const raw = await fs.readFile(STORE_FILE, "utf-8");
+    const parsed = JSON.parse(raw) as PersistedStore;
+    users.clear();
+    teams.clear();
+    gamesByTeam.clear();
+
+    for (const user of parsed.users || []) users.set(user.id, user);
+    for (const team of parsed.teams || []) teams.set(team.id, team);
+    for (const [teamId, games] of Object.entries(parsed.gamesByTeam || {})) {
+      gamesByTeam.set(teamId, games || []);
+    }
+  } catch (error: any) {
+    if (error?.code !== "ENOENT") {
+      console.error("Failed to load persisted store:", error);
+    }
+  }
+}
+
+function persistStore() {
+  persistChain = persistChain.then(async () => {
+    const data: PersistedStore = {
+      users: [...users.values()],
+      teams: [...teams.values()],
+      gamesByTeam: Object.fromEntries(gamesByTeam.entries()),
+    };
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.writeFile(STORE_FILE, JSON.stringify(data, null, 2), "utf-8");
+  }).catch((error) => {
+    console.error("Failed to persist store:", error);
+  });
+
+  return persistChain;
+}
+
+await loadStore();
 
 app.use(express.json({ limit: "5mb" }));
 app.use(cookieParser());
@@ -130,6 +179,7 @@ app.post("/api/auth/register", async (req, res) => {
   const passwordHash = await bcrypt.hash(password, 10);
   users.set(userId, { id: userId, name, email, passwordHash });
   ensureDefaultTeam(userId);
+  await persistStore();
   setAuthCookie(res, userId);
   return res.json({ id: userId, name, email });
 });
@@ -163,7 +213,7 @@ app.get("/api/teams", auth, (req: AuthedRequest, res) => {
   return res.json(userTeams);
 });
 
-app.post("/api/teams", auth, (req: AuthedRequest, res) => {
+app.post("/api/teams", auth, async (req: AuthedRequest, res) => {
   const name = String(req.body?.name || "New Team").trim();
   const teamId = crypto.randomUUID();
   const branding: TeamBranding = req.body?.branding || { teamName: name || "New Team" };
@@ -180,10 +230,11 @@ app.post("/api/teams", auth, (req: AuthedRequest, res) => {
   };
   teams.set(teamId, team);
   gamesByTeam.set(teamId, []);
+  await persistStore();
   return res.status(201).json(team);
 });
 
-app.put("/api/teams/:teamId", auth, (req: AuthedRequest, res) => {
+app.put("/api/teams/:teamId", auth, async (req: AuthedRequest, res) => {
   const team = teamFor(req, req.params.teamId);
   if (!team) return res.status(404).json({ error: "Team not found" });
 
@@ -195,6 +246,7 @@ app.put("/api/teams/:teamId", auth, (req: AuthedRequest, res) => {
     roster: Array.isArray(req.body?.roster) ? req.body.roster : team.roster,
   };
   teams.set(team.id, next);
+  await persistStore();
   return res.json(next);
 });
 
@@ -204,7 +256,7 @@ app.get("/api/teams/:teamId/games", auth, (req: AuthedRequest, res) => {
   return res.json(gamesByTeam.get(team.id) || []);
 });
 
-app.post("/api/teams/:teamId/games", auth, (req: AuthedRequest, res) => {
+app.post("/api/teams/:teamId/games", auth, async (req: AuthedRequest, res) => {
   const team = teamFor(req, req.params.teamId);
   if (!team) return res.status(404).json({ error: "Team not found" });
 
@@ -228,10 +280,11 @@ app.post("/api/teams/:teamId/games", auth, (req: AuthedRequest, res) => {
   const games = gamesByTeam.get(team.id) || [];
   games.push(game);
   gamesByTeam.set(team.id, games);
+  await persistStore();
   return res.status(201).json({ id: game.id });
 });
 
-app.delete("/api/teams/:teamId/games/:gameId", auth, (req: AuthedRequest, res) => {
+app.delete("/api/teams/:teamId/games/:gameId", auth, async (req: AuthedRequest, res) => {
   const team = teamFor(req, req.params.teamId);
   if (!team) return res.status(404).json({ error: "Team not found" });
 
@@ -240,29 +293,35 @@ app.delete("/api/teams/:teamId/games/:gameId", auth, (req: AuthedRequest, res) =
     team.id,
     games.filter((g) => g.id !== req.params.gameId),
   );
+  await persistStore();
   return res.status(204).end();
 });
+if (IS_PROD) {
+  const distPath = path.resolve(__dirname, "dist");
+  app.use(express.static(distPath));
+  app.use("*", (_req, res) => {
+    res.sendFile(path.resolve(distPath, "index.html"));
+  });
+} else {
+  const vite = await createViteServer({
+    server: { middlewareMode: true },
+    appType: "spa",
+  });
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const vite = await createViteServer({
-  server: { middlewareMode: true },
-  appType: "spa",
-});
+  app.use(vite.middlewares);
 
-app.use(vite.middlewares);
-
-app.use("*", async (req, res, next) => {
-  try {
-    const templatePath = path.resolve(__dirname, "index.html");
-    const template = await fs.readFile(templatePath, "utf-8");
-    const html = await vite.transformIndexHtml(req.originalUrl, template);
-    res.status(200).setHeader("Content-Type", "text/html").end(html);
-  } catch (error) {
-    next(error);
-  }
-});
+  app.use("*", async (req, res, next) => {
+    try {
+      const templatePath = path.resolve(__dirname, "index.html");
+      const template = await fs.readFile(templatePath, "utf-8");
+      const html = await vite.transformIndexHtml(req.originalUrl, template);
+      res.status(200).setHeader("Content-Type", "text/html").end(html);
+    } catch (error) {
+      next(error);
+    }
+  });
+}
 
 app.listen(PORT, () => {
-  console.log(`Lineup Pro dev server running on http://localhost:${PORT}`);
+  console.log(`Lineup Pro server running on http://localhost:${PORT} (${IS_PROD ? "production" : "development"})`);
 });

@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: lineuppro
+    env: node
+    plan: free
+    autoDeploy: true
+    buildCommand: cd "lineup-pro (2)" && npm ci && npm run build
+    startCommand: cd "lineup-pro (2)" && npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: JWT_SECRET
+        generateValue: true

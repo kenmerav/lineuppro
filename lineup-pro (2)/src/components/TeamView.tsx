@@ -13,6 +13,7 @@ import { AnalyticsTab } from './AnalyticsTab';
 import { PostGameTab } from './PostGameTab';
 import { GamesTab } from './GamesTab';
 import { SettingsTab } from './SettingsTab';
+import { DefensiveFieldDiagram } from './DefensiveFieldDiagram';
 import { useAppState } from '../hooks/useAppState';
 import { Users, Hash, Shield, BarChart3, FolderOpen, Settings as SettingsIcon, Printer, Share2, ClipboardCheck, LayoutDashboard, Loader2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -25,6 +26,7 @@ export const TeamView: React.FC = () => {
   const { teamId } = useParams<{ teamId: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('roster');
+  const [selectedInning, setSelectedInning] = useState(1);
   const {
     players, battingOrder, assignments, settings, branding, savedGames, gameLog, loading,
     setBattingOrder, setAssignments, setSettings, setBranding, setSavedGames, setGameLog,
@@ -40,6 +42,12 @@ export const TeamView: React.FC = () => {
     };
     checkAuth();
   }, [navigate]);
+
+  useEffect(() => {
+    if (selectedInning > assignments.innings) {
+      setSelectedInning(assignments.innings || 1);
+    }
+  }, [assignments.innings, selectedInning]);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -80,6 +88,15 @@ ${Array.from({ length: assignments.innings }, (_, i) => {
 
     navigator.clipboard.writeText(text);
     alert('Lineup copied to clipboard!');
+  };
+
+  const allFieldPositions = [...POSITION_GROUPS.INFIELD, ...POSITION_GROUPS.OUTFIELD];
+  const getPlayerPositionForInning = (playerId: string, inningNum: number) => {
+    const inning = assignments.byInning[inningNum];
+    if (!inning) return '-';
+    if ((inning.dugout || []).includes(playerId)) return 'BENCH';
+    const pos = allFieldPositions.find((p) => inning[p] === playerId);
+    return pos || '-';
   };
 
   return (
@@ -176,6 +193,8 @@ ${Array.from({ length: assignments.innings }, (_, i) => {
                 settings={settings} 
                 onUpdate={setAssignments} 
                 onGenerate={generateDefense}
+                selectedInning={selectedInning}
+                onSelectedInningChange={setSelectedInning}
               />
             )}
             {activeTab === 'analytics' && (
@@ -216,62 +235,72 @@ ${Array.from({ length: assignments.innings }, (_, i) => {
       </main>
 
       {/* Print View Overlay (Hidden normally) */}
-      <div className="hidden print:block fixed inset-0 bg-white z-[100] p-8 overflow-y-auto">
-        <div className="flex flex-col items-center mb-8">
+      <div className="hidden print:block fixed inset-0 bg-white z-[100] p-0 overflow-hidden">
+        <div className="h-full w-full flex flex-col gap-2 px-3 py-2">
+        <div className="flex flex-col items-center mb-1">
           {branding.logoDataUrl && (
-            <img src={branding.logoDataUrl} alt="Logo" className="h-24 mb-4 object-contain" referrerPolicy="no-referrer" />
+            <img src={branding.logoDataUrl} alt="Logo" className="h-14 mb-1 object-contain" referrerPolicy="no-referrer" />
           )}
-          <h1 className="text-4xl font-black text-slate-900">{branding.teamName}</h1>
-          <p className="text-slate-500 font-bold uppercase tracking-widest mt-2">Game Lineup & Rotation</p>
+          <h1 className="text-2xl font-black text-slate-900 leading-tight">{branding.teamName}</h1>
+          <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">Game Lineup & Rotation</p>
         </div>
 
-        <div className="grid grid-cols-3 gap-8">
-          <div className="col-span-1 border-r border-slate-200 pr-8">
-            <h2 className="text-xl font-black mb-4 border-b-2 border-slate-900 pb-2 uppercase">Batting Order</h2>
-            <div className="space-y-2">
-              {(battingOrder || []).map((id, i) => (
-                <div key={id} className="flex items-center gap-3 font-bold text-lg">
-                  <span className="w-8 h-8 flex items-center justify-center bg-slate-900 text-white rounded-full text-sm">{i + 1}</span>
-                  <span className="text-slate-800">{(players || []).find(p => p.id === id)?.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="col-span-2">
-            <h2 className="text-xl font-black mb-4 border-b-2 border-slate-900 pb-2 uppercase">Defensive Rotation</h2>
-            <table className="w-full border-collapse">
+        <div className="grid grid-cols-[2fr_1fr] gap-3 items-start min-h-0 flex-1">
+          <div className="min-w-0">
+            <h2 className="text-sm font-black mb-2 border-b-2 border-slate-900 pb-1 uppercase">Batting Order + Positions</h2>
+            <table className="w-full border-collapse table-fixed">
               <thead>
                 <tr>
-                  <th className="p-2 text-left text-xs font-bold text-slate-400 uppercase">Pos</th>
+                  <th className="w-10 p-1 text-center text-[10px] font-black text-slate-500 border border-slate-300 bg-slate-100">#</th>
+                  <th className="w-44 p-1 text-left text-[10px] font-black text-slate-500 border border-slate-300 bg-slate-100">Player</th>
                   {Array.from({ length: assignments.innings }, (_, i) => (
-                    <th key={i} className="p-2 text-center text-sm font-bold bg-slate-100 border border-slate-200">Inn {i + 1}</th>
+                    <th key={i} className="p-1 text-center text-[10px] font-black text-slate-500 border border-slate-300 bg-slate-100">
+                      In {i + 1}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {[...POSITION_GROUPS.INFIELD, ...POSITION_GROUPS.OUTFIELD, 'Bench'].map(pos => (
-                  <tr key={pos}>
-                    <td className="p-2 font-bold text-slate-600 text-sm border border-slate-200">{pos}</td>
-                    {Array.from({ length: assignments.innings }, (_, i) => {
-                      const inningNum = i + 1;
-                      const inning = assignments.byInning[inningNum];
-                      let name = '-';
-                      if (pos === 'Bench') {
-                        name = inning?.dugout.map(pid => (players || []).find(p => p.id === pid)?.name).join(', ') || '-';
-                      } else {
-                        const pid = inning?.[pos];
-                        name = (players || []).find(p => p.id === pid)?.name || '-';
-                      }
-                      return (
-                        <td key={i} className="p-2 text-center text-sm font-medium border border-slate-200">{name}</td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                {(battingOrder || []).map((id, i) => {
+                  const playerName = (players || []).find(p => p.id === id)?.name || '-';
+                  return (
+                    <tr key={id}>
+                      <td className="p-1 text-center text-xs font-bold text-slate-800 border border-slate-300">{i + 1}</td>
+                      <td className="p-1 text-xs font-semibold text-slate-800 border border-slate-300 truncate">{playerName}</td>
+                      {Array.from({ length: assignments.innings }, (_, inningIndex) => {
+                        const inningNum = inningIndex + 1;
+                        const pos = getPlayerPositionForInning(id, inningNum);
+                        return (
+                          <td
+                            key={inningNum}
+                            className="p-1 text-center text-[10px] font-bold border border-slate-300 text-slate-700"
+                          >
+                            {pos}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
+
+          <div className="space-y-2">
+            <DefensiveFieldDiagram
+              assignments={assignments}
+              players={players}
+              inning={selectedInning}
+              title={`Field - Inning ${selectedInning}`}
+              className="print:border-slate-300 w-full max-w-none mx-auto"
+              showPlayerNames={false}
+              showBenchSummary={false}
+            />
+            <div className="text-[10px] text-slate-500 font-semibold text-center">
+              Position codes are listed by inning in the table.
+            </div>
+          </div>
+        </div>
         </div>
       </div>
 
