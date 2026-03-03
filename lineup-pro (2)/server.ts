@@ -11,7 +11,16 @@ import fs from "node:fs/promises";
 
 dotenv.config();
 
-type Player = { id: string; name: string; number?: string; color: string; active?: boolean };
+type Player = {
+  id: string;
+  name: string;
+  number?: string;
+  walkoutSongName?: string;
+  walkoutSongDataUrl?: string;
+  walkoutStartSec?: number;
+  color: string;
+  active?: boolean;
+};
 type TeamBranding = { teamName: string; logoDataUrl?: string; bannerColor?: string };
 type Settings = {
   inningsCount: number;
@@ -241,7 +250,7 @@ function persistStore() {
 
 await loadStore();
 
-app.use(express.json({ limit: "5mb" }));
+app.use(express.json({ limit: "25mb" }));
 app.use(cookieParser());
 
 function setAuthCookie(res: Response, userId: string) {

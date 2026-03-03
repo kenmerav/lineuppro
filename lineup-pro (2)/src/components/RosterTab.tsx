@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Users, FileText, Edit2, Check, X } from 'lucide-react';
+import { Plus, Trash2, Users, Edit2, Check, X, Upload, Music2 } from 'lucide-react';
 import { Player } from '../types';
 
 import { cn } from '../lib/utils';
@@ -17,6 +17,7 @@ interface RosterTabProps {
 export const RosterTab: React.FC<RosterTabProps> = ({ 
   players, onAdd, onBulkAdd, onUpdate, onDelete, onSaveAsMaster, onLoadMaster 
 }) => {
+  const MAX_WALKOUT_FILE_BYTES = 6 * 1024 * 1024;
   const [newName, setNewName] = useState('');
   const [newNumber, setNewNumber] = useState('');
   const [bulkNames, setBulkNames] = useState('');
@@ -55,6 +56,33 @@ export const RosterTab: React.FC<RosterTabProps> = ({
   };
 
   const activeCount = players.filter(p => p.active !== false).length;
+
+  const handleWalkoutUpload = (playerId: string, file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith('audio/')) {
+      alert('Please choose an audio file.');
+      return;
+    }
+    if (file.size > MAX_WALKOUT_FILE_BYTES) {
+      alert('Walkout file is too large. Please keep files under 6MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      onUpdate(playerId, {
+        walkoutSongDataUrl: reader.result as string,
+        walkoutSongName: file.name
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const sanitizeStartSeconds = (value: string) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) return 0;
+    return Math.round(numeric * 10) / 10;
+  };
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
@@ -138,83 +166,131 @@ export const RosterTab: React.FC<RosterTabProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {players.map((player) => (
-          <div 
+          <div
             key={player.id}
             className={cn(
-              "bg-white p-4 rounded-xl border shadow-sm flex items-center justify-between group transition-all",
+              "bg-white p-4 rounded-xl border shadow-sm group transition-all",
               player.active === false ? "opacity-60 border-slate-100 grayscale bg-slate-50" : "border-slate-100 hover:border-indigo-200"
             )}
           >
-            <div className="flex items-center gap-3 flex-1 overflow-hidden">
-              <button 
-                onClick={() => onUpdate(player.id, { active: player.active === false })}
-                className={cn(
-                  "w-5 h-5 rounded-md border flex items-center justify-center transition-colors",
-                  player.active === false ? "bg-slate-100 border-slate-200 text-slate-400" : "bg-emerald-500 border-emerald-600 text-white"
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 flex-1 overflow-hidden">
+                <button
+                  onClick={() => onUpdate(player.id, { active: player.active === false })}
+                  className={cn(
+                    "w-5 h-5 rounded-md border flex items-center justify-center transition-colors",
+                    player.active === false ? "bg-slate-100 border-slate-200 text-slate-400" : "bg-emerald-500 border-emerald-600 text-white"
+                  )}
+                  title={player.active === false ? "Mark as Present" : "Mark as Absent"}
+                >
+                  {player.active !== false && <Check size={12} strokeWidth={4} />}
+                </button>
+                <div
+                  className="w-3 h-3 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: player.color }}
+                />
+                {editingId === player.id ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <input
+                      type="text"
+                      value={editNumber}
+                      onChange={(e) => setEditNumber(e.target.value.replace(/[^\d]/g, '').slice(0, 3))}
+                      onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                      className="w-14 bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 text-slate-700 text-sm font-semibold"
+                      placeholder="#"
+                      autoFocus
+                    />
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                      className="flex-1 bg-slate-50 border-none focus:ring-0 p-0 text-slate-800 font-medium"
+                    />
+                  </div>
+                ) : (
+                  <span className={cn(
+                    "font-medium truncate",
+                    player.active === false ? "text-slate-400 line-through" : "text-slate-700"
+                  )}>
+                    {player.number ? `#${player.number} ` : ''}{player.name}
+                  </span>
                 )}
-                title={player.active === false ? "Mark as Present" : "Mark as Absent"}
-              >
-                {player.active !== false && <Check size={12} strokeWidth={4} />}
-              </button>
-              <div 
-                className="w-3 h-3 rounded-full flex-shrink-0" 
-                style={{ backgroundColor: player.color }}
-              />
-              {editingId === player.id ? (
-                <div className="flex items-center gap-2 flex-1">
-                  <input
-                    type="text"
-                    value={editNumber}
-                    onChange={(e) => setEditNumber(e.target.value.replace(/[^\d]/g, '').slice(0, 3))}
-                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
-                    className="w-14 bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 text-slate-700 text-sm font-semibold"
-                    placeholder="#"
-                    autoFocus
-                  />
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
-                    className="flex-1 bg-slate-50 border-none focus:ring-0 p-0 text-slate-800 font-medium"
-                  />
-                </div>
-              ) : (
-                <span className={cn(
-                  "font-medium truncate",
-                  player.active === false ? "text-slate-400 line-through" : "text-slate-700"
-                )}>
-                  {player.number ? `#${player.number} ` : ''}{player.name}
-                </span>
-              )}
+              </div>
+
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {editingId === player.id ? (
+                  <>
+                    <button onClick={saveEdit} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg">
+                      <Check size={16} />
+                    </button>
+                    <button onClick={() => setEditingId(null)} className="p-1.5 text-slate-400 hover:bg-slate-50 rounded-lg">
+                      <X size={16} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      type="color"
+                      value={player.color}
+                      onChange={(e) => onUpdate(player.id, { color: e.target.value })}
+                      className="w-6 h-6 p-0 border-none bg-transparent cursor-pointer"
+                    />
+                    <button onClick={() => startEdit(player)} className="p-1.5 text-slate-400 hover:bg-slate-50 rounded-lg">
+                      <Edit2 size={16} />
+                    </button>
+                    <button onClick={() => onDelete(player.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg">
+                      <Trash2 size={16} />
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-            
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              {editingId === player.id ? (
-                <>
-                  <button onClick={saveEdit} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg">
-                    <Check size={16} />
-                  </button>
-                  <button onClick={() => setEditingId(null)} className="p-1.5 text-slate-400 hover:bg-slate-50 rounded-lg">
-                    <X size={16} />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <input 
-                    type="color" 
-                    value={player.color} 
-                    onChange={(e) => onUpdate(player.id, { color: e.target.value })}
-                    className="w-6 h-6 p-0 border-none bg-transparent cursor-pointer"
+
+            <div className="mt-3 border-t border-slate-100 pt-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <label className="inline-flex items-center gap-2 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg px-2.5 py-1.5 cursor-pointer">
+                  <Upload size={12} />
+                  Upload Walkout
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      handleWalkoutUpload(player.id, e.target.files?.[0]);
+                      e.currentTarget.value = '';
+                    }}
                   />
-                  <button onClick={() => startEdit(player)} className="p-1.5 text-slate-400 hover:bg-slate-50 rounded-lg">
-                    <Edit2 size={16} />
+                </label>
+
+                <div className="inline-flex items-center gap-1">
+                  <span className="text-[11px] text-slate-500 font-semibold">Start</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    value={player.walkoutStartSec ?? 0}
+                    onChange={(e) => onUpdate(player.id, { walkoutStartSec: sanitizeStartSeconds(e.target.value) })}
+                    className="w-16 p-1 border border-slate-200 rounded text-xs font-semibold text-slate-700"
+                  />
+                  <span className="text-[11px] text-slate-500 font-semibold">sec</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex items-center gap-1.5 text-[11px] text-slate-500">
+                  <Music2 size={12} />
+                  <span className="truncate">{player.walkoutSongName || 'No walkout song uploaded'}</span>
+                </div>
+                {player.walkoutSongDataUrl && (
+                  <button
+                    onClick={() => onUpdate(player.id, { walkoutSongDataUrl: undefined, walkoutSongName: undefined })}
+                    className="text-[11px] font-semibold text-red-600 hover:text-red-700"
+                  >
+                    Remove
                   </button>
-                  <button onClick={() => onDelete(player.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg">
-                    <Trash2 size={16} />
-                  </button>
-                </>
-              )}
+                )}
+              </div>
             </div>
           </div>
         ))}

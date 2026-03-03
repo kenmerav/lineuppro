@@ -2,6 +2,9 @@ export interface Player {
   id: string;
   name: string;
   number?: string;
+  walkoutSongName?: string;
+  walkoutSongDataUrl?: string;
+  walkoutStartSec?: number;
   color: string;
   active?: boolean;
 }
