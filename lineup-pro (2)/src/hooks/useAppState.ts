@@ -156,10 +156,11 @@ export function useAppState(teamId?: string) {
     setActiveGameId(null);
   }, [settings.inningsCount]);
 
-  const addPlayer = useCallback((name: string) => {
+  const addPlayer = useCallback((name: string, number?: string) => {
     const newPlayer: Player = {
       id: crypto.randomUUID(),
       name,
+      number: number?.trim() || undefined,
       color: PLAYER_COLORS[players.length % PLAYER_COLORS.length],
       active: true
     };
@@ -170,12 +171,19 @@ export function useAppState(teamId?: string) {
 
   const bulkAddPlayers = useCallback((names: string) => {
     const newNames = names.split("\n").map(n => n.trim()).filter(n => n.length > 0);
-    const newPlayers: Player[] = newNames.map((name, i) => ({
-      id: crypto.randomUUID(),
-      name,
-      color: PLAYER_COLORS[(players.length + i) % PLAYER_COLORS.length],
-      active: true
-    }));
+    const newPlayers: Player[] = newNames.map((line, i) => {
+      // Supports bulk lines like "12 Mike" or "Mike".
+      const match = line.match(/^#?(\d+)\s+(.+)$/);
+      const parsedNumber = match ? match[1] : undefined;
+      const parsedName = match ? match[2].trim() : line;
+      return {
+        id: crypto.randomUUID(),
+        name: parsedName,
+        number: parsedNumber,
+        color: PLAYER_COLORS[(players.length + i) % PLAYER_COLORS.length],
+        active: true
+      };
+    });
     setPlayers(prev => [...prev, ...newPlayers]);
     setMasterRoster(prev => [...prev, ...newPlayers]);
     setBattingOrder(prev => [...prev, ...newPlayers.map(p => p.id)]);

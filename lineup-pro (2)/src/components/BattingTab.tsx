@@ -83,7 +83,9 @@ const SortableItem: React.FC<SortableItemProps> = ({ id, player, index, assignme
             className="w-1.5 h-8 rounded-full" 
             style={{ backgroundColor: player.color }}
           />
-          <span className="font-semibold text-slate-800 min-w-[120px]">{player.name}</span>
+          <span className="font-semibold text-slate-800 min-w-[120px]">
+            {player.number ? `#${player.number} ` : ''}{player.name}
+          </span>
         </div>
 
         {/* Defensive Positions */}

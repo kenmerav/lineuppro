@@ -11,7 +11,7 @@ import fs from "node:fs/promises";
 
 dotenv.config();
 
-type Player = { id: string; name: string; color: string; active?: boolean };
+type Player = { id: string; name: string; number?: string; color: string; active?: boolean };
 type TeamBranding = { teamName: string; logoDataUrl?: string; bannerColor?: string };
 type Settings = {
   inningsCount: number;

@@ -1,6 +1,7 @@
 export interface Player {
   id: string;
   name: string;
+  number?: string;
   color: string;
   active?: boolean;
 }

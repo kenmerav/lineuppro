@@ -73,16 +73,22 @@ export const TeamView: React.FC = () => {
   };
 
   const handleShare = () => {
+    const formatPlayer = (playerId: string) => {
+      const player = players.find((p) => p.id === playerId);
+      if (!player) return "-";
+      return `${player.number ? `#${player.number} ` : ""}${player.name}`;
+    };
+
     const text = `
 Team: ${branding.teamName}
 Batting Order:
-${battingOrder.map((id, i) => `${i + 1}. ${players.find(p => p.id === id)?.name}`).join('\n')}
+${battingOrder.map((id, i) => `${i + 1}. ${formatPlayer(id)}`).join('\n')}
 
 Defensive Rotation:
 ${Array.from({ length: assignments.innings }, (_, i) => {
   const inningNum = i + 1;
   const inning = assignments.byInning[inningNum];
-  return `Inning ${inningNum}: ${Object.entries(inning || {}).filter(([k]) => k !== 'dugout').map(([pos, pid]) => `${pos}: ${players.find(p => p.id === pid)?.name}`).join(', ')}`;
+  return `Inning ${inningNum}: ${Object.entries(inning || {}).filter(([k]) => k !== 'dugout').map(([pos, pid]) => `${pos}: ${formatPlayer(String(pid))}`).join(', ')}`;
 }).join('\n')}
     `.trim();
 
@@ -300,7 +306,8 @@ ${Array.from({ length: assignments.innings }, (_, i) => {
               </thead>
               <tbody>
                 {(battingOrder || []).map((id, i) => {
-                  const playerName = (players || []).find(p => p.id === id)?.name || '-';
+                  const player = (players || []).find(p => p.id === id);
+                  const playerName = player ? `${player.number ? `#${player.number} ` : ''}${player.name}` : '-';
                   return (
                     <tr key={id}>
                       <td className="p-1 text-center text-xs font-bold text-slate-800 border border-slate-300">{i + 1}</td>

@@ -6,7 +6,7 @@ import { cn } from '../lib/utils';
 
 interface RosterTabProps {
   players: Player[];
-  onAdd: (name: string) => void;
+  onAdd: (name: string, number?: string) => void;
   onBulkAdd: (names: string) => void;
   onUpdate: (id: string, updates: Partial<Player>) => void;
   onDelete: (id: string) => void;
@@ -18,15 +18,18 @@ export const RosterTab: React.FC<RosterTabProps> = ({
   players, onAdd, onBulkAdd, onUpdate, onDelete, onSaveAsMaster, onLoadMaster 
 }) => {
   const [newName, setNewName] = useState('');
+  const [newNumber, setNewNumber] = useState('');
   const [bulkNames, setBulkNames] = useState('');
   const [isBulk, setIsBulk] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [editNumber, setEditNumber] = useState('');
 
   const handleAdd = () => {
     if (newName.trim()) {
-      onAdd(newName.trim());
+      onAdd(newName.trim(), newNumber.trim() || undefined);
       setNewName('');
+      setNewNumber('');
     }
   };
 
@@ -41,11 +44,12 @@ export const RosterTab: React.FC<RosterTabProps> = ({
   const startEdit = (player: Player) => {
     setEditingId(player.id);
     setEditName(player.name);
+    setEditNumber(player.number || '');
   };
 
   const saveEdit = () => {
     if (editingId && editName.trim()) {
-      onUpdate(editingId, { name: editName.trim() });
+      onUpdate(editingId, { name: editName.trim(), number: editNumber.trim() || undefined });
       setEditingId(null);
     }
   };
@@ -94,7 +98,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({
             <textarea
               value={bulkNames}
               onChange={(e) => setBulkNames(e.target.value)}
-              placeholder="Enter one name per line..."
+              placeholder="Enter one player per line (optional number first, e.g. 12 Mike)..."
               className="w-full h-32 p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
             />
             <button 
@@ -106,6 +110,14 @@ export const RosterTab: React.FC<RosterTabProps> = ({
           </div>
         ) : (
           <div className="flex gap-2">
+            <input
+              type="text"
+              value={newNumber}
+              onChange={(e) => setNewNumber(e.target.value.replace(/[^\d]/g, '').slice(0, 3))}
+              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              placeholder="#"
+              className="w-20 p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+            />
             <input
               type="text"
               value={newName}
@@ -149,20 +161,30 @@ export const RosterTab: React.FC<RosterTabProps> = ({
                 style={{ backgroundColor: player.color }}
               />
               {editingId === player.id ? (
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
-                  className="flex-1 bg-slate-50 border-none focus:ring-0 p-0 text-slate-800 font-medium"
-                  autoFocus
-                />
+                <div className="flex items-center gap-2 flex-1">
+                  <input
+                    type="text"
+                    value={editNumber}
+                    onChange={(e) => setEditNumber(e.target.value.replace(/[^\d]/g, '').slice(0, 3))}
+                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                    className="w-14 bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 text-slate-700 text-sm font-semibold"
+                    placeholder="#"
+                    autoFocus
+                  />
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                    className="flex-1 bg-slate-50 border-none focus:ring-0 p-0 text-slate-800 font-medium"
+                  />
+                </div>
               ) : (
                 <span className={cn(
                   "font-medium truncate",
                   player.active === false ? "text-slate-400 line-through" : "text-slate-700"
                 )}>
-                  {player.name}
+                  {player.number ? `#${player.number} ` : ''}{player.name}
                 </span>
               )}
             </div>
