@@ -29,7 +29,7 @@ export const TeamView: React.FC = () => {
   const [selectedInning, setSelectedInning] = useState(1);
   const {
     players, battingOrder, assignments, settings, branding, savedGames, gameLog, loading, activeGameId,
-    setBattingOrder, setAssignments, setSettings, setBranding, setGameLog,
+    setBattingOrder, setAssignments, setSettings, updateInningsCount, setBranding, setGameLog,
     addPlayer, bulkAddPlayers, updatePlayer, deletePlayer,
     saveGame, updateGame, loadGame, deleteGame, importGame, generateDefense,
     saveAsMasterRoster, loadMasterRoster, startNewGame
@@ -126,7 +126,7 @@ ${Array.from({ length: assignments.innings }, (_, i) => {
       alert(`Saved "${gameName}". Opening Games tab.`);
     } catch (error) {
       console.error(error);
-      alert('Failed to save game. Please try again.');
+      alert(error instanceof Error ? error.message : 'Failed to save game. Please try again.');
     }
   };
 
@@ -233,6 +233,7 @@ ${Array.from({ length: assignments.innings }, (_, i) => {
                 assignments={assignments} 
                 settings={settings} 
                 onUpdate={setAssignments} 
+                onInningsCountChange={updateInningsCount}
                 onGenerate={generateDefense}
                 onSaveAsGame={handleSaveCurrentAsGame}
                 selectedInning={selectedInning}

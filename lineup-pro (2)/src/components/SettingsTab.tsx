@@ -14,6 +14,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
     onUpdate({ ...settings, [key]: value });
   };
 
+  const handleInningsChange = (value: string) => {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) return;
+    handleChange('inningsCount', Math.max(1, parsed));
+  };
+
   const addCustomRule = () => {
     const trimmed = newRule.trim();
     if (!trimmed) return;
@@ -47,25 +53,38 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
           </div>
           
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-bold text-slate-700">Innings Count</p>
-                <p className="text-xs text-slate-400">Number of innings to plan for (3-7)</p>
+                <p className="text-xs text-slate-400">Set any positive whole number of innings.</p>
               </div>
               <div className="flex items-center gap-2">
-                {[3, 4, 5, 6, 7].map(num => (
-                  <button
-                    key={num}
-                    onClick={() => handleChange('inningsCount', num)}
-                    className={`w-10 h-10 rounded-xl font-bold transition-all ${
-                      settings.inningsCount === num 
-                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 scale-110' 
-                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                    }`}
-                  >
-                    {num}
-                  </button>
-                ))}
+                <button
+                  type="button"
+                  onClick={() => handleChange('inningsCount', Math.max(1, settings.inningsCount - 1))}
+                  className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 font-bold transition-colors hover:bg-slate-200"
+                  aria-label="Decrease innings"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  inputMode="numeric"
+                  value={settings.inningsCount}
+                  onChange={(e) => handleInningsChange(e.target.value)}
+                  className="w-24 rounded-xl border border-slate-200 px-3 py-2 text-center font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                  aria-label="Innings count"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleChange('inningsCount', settings.inningsCount + 1)}
+                  className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 font-bold transition-colors hover:bg-slate-200"
+                  aria-label="Increase innings"
+                >
+                  +
+                </button>
               </div>
             </div>
           </div>

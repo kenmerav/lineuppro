@@ -11,6 +11,7 @@ interface DefenseTabProps {
   assignments: DefenseAssignments;
   settings: Settings;
   onUpdate: (assignments: DefenseAssignments) => void;
+  onInningsCountChange: (inningsCount: number) => void;
   onGenerate: () => void;
   onSaveAsGame: () => Promise<void>;
   selectedInning: number;
@@ -22,6 +23,7 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
   assignments,
   settings,
   onUpdate,
+  onInningsCountChange,
   onGenerate,
   onSaveAsGame,
   selectedInning,
@@ -30,6 +32,12 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
   const [selectedCell, setSelectedCell] = useState<{ inning: number; pos: string } | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'field'>('table');
   const validation = useMemo(() => validateAll(assignments, players, settings), [assignments, players, settings]);
+
+  const handleInningsInputChange = (value: string) => {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) return;
+    onInningsCountChange(parsed);
+  };
 
   const handleAssign = (playerId: string | null) => {
     if (!selectedCell) return;
@@ -187,32 +195,64 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
           </button>
         </div>
 
-        <div className="inline-flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1">
-          <button
-            onClick={() => onSelectedInningChange(Math.max(1, selectedInning - 1))}
-            className="h-9 w-9 rounded-lg hover:bg-slate-100 text-slate-600 flex items-center justify-center"
-            title="Previous inning"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <select
-            value={selectedInning}
-            onChange={(e) => onSelectedInningChange(Number(e.target.value))}
-            className="h-9 bg-transparent text-sm font-semibold text-slate-700 px-2 outline-none"
-          >
-            {Array.from({ length: assignments.innings }, (_, i) => i + 1).map((inning) => (
-              <option key={inning} value={inning}>
-                Inning {inning}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={() => onSelectedInningChange(Math.min(assignments.innings, selectedInning + 1))}
-            className="h-9 w-9 rounded-lg hover:bg-slate-100 text-slate-600 flex items-center justify-center"
-            title="Next inning"
-          >
-            <ChevronRight size={18} />
-          </button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="inline-flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1.5">
+            <span className="px-2 text-xs font-bold uppercase tracking-wider text-slate-400">Planned innings</span>
+            <button
+              type="button"
+              onClick={() => onInningsCountChange(Math.max(1, assignments.innings - 1))}
+              className="h-9 w-9 rounded-lg hover:bg-slate-100 text-slate-600 flex items-center justify-center"
+              title="Decrease innings"
+            >
+              -
+            </button>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              inputMode="numeric"
+              value={assignments.innings}
+              onChange={(e) => handleInningsInputChange(e.target.value)}
+              className="h-9 w-20 rounded-lg border border-slate-200 px-2 text-center text-sm font-semibold text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+              aria-label="Planned innings"
+            />
+            <button
+              type="button"
+              onClick={() => onInningsCountChange(assignments.innings + 1)}
+              className="h-9 w-9 rounded-lg hover:bg-slate-100 text-slate-600 flex items-center justify-center"
+              title="Increase innings"
+            >
+              +
+            </button>
+          </div>
+
+          <div className="inline-flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1">
+            <button
+              onClick={() => onSelectedInningChange(Math.max(1, selectedInning - 1))}
+              className="h-9 w-9 rounded-lg hover:bg-slate-100 text-slate-600 flex items-center justify-center"
+              title="Previous inning"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <select
+              value={selectedInning}
+              onChange={(e) => onSelectedInningChange(Number(e.target.value))}
+              className="h-9 bg-transparent text-sm font-semibold text-slate-700 px-2 outline-none"
+            >
+              {Array.from({ length: assignments.innings }, (_, i) => i + 1).map((inning) => (
+                <option key={inning} value={inning}>
+                  Inning {inning}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => onSelectedInningChange(Math.min(assignments.innings, selectedInning + 1))}
+              className="h-9 w-9 rounded-lg hover:bg-slate-100 text-slate-600 flex items-center justify-center"
+              title="Next inning"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
         </div>
       </div>
 
