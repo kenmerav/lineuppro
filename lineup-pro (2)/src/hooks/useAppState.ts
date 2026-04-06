@@ -27,6 +27,15 @@ const resizeAssignments = (currentAssignments: DefenseAssignments, inningsCount:
   const safeInningsCount = sanitizeInningsCount(inningsCount);
   const nextByInning: DefenseAssignments["byInning"] = {};
 
+  Object.entries(currentAssignments.byInning || {}).forEach(([inningKey, inningValue]) => {
+    const inningNumber = Number(inningKey);
+    if (!Number.isFinite(inningNumber) || !inningValue) return;
+    nextByInning[inningNumber] = {
+      ...inningValue,
+      dugout: [...(inningValue.dugout || [])],
+    };
+  });
+
   for (let inning = 1; inning <= safeInningsCount; inning++) {
     const existing = currentAssignments.byInning[inning];
     nextByInning[inning] = existing ? { ...existing, dugout: [...(existing.dugout || [])] } : { dugout: [] };
