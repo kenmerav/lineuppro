@@ -300,7 +300,7 @@ ${Array.from({ length: assignments.innings }, (_, i) => {
                   <th className="w-44 p-1 text-left text-[10px] font-black text-slate-500 border border-slate-300 bg-slate-100">Player</th>
                   {Array.from({ length: assignments.innings }, (_, i) => (
                     <th key={i} className="p-1 text-center text-[10px] font-black text-slate-500 border border-slate-300 bg-slate-100">
-                      In {i + 1}
+                      Inn {i + 1}
                     </th>
                   ))}
                 </tr>
