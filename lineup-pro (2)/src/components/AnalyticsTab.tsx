@@ -15,7 +15,7 @@ interface AnalyticsTabProps {
 
 export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ players, assignments, settings, gameLog, savedGames }) => {
   const [view, setView] = useState<'current' | 'season'>('current');
-  const metrics = useMemo(() => computeFairness(players, assignments, gameLog), [players, assignments, gameLog]);
+  const metrics = useMemo(() => computeFairness(players, assignments), [players, assignments]);
   const seasonMetrics = useMemo(() => computeSeasonFairness(savedGames, players), [savedGames, players]);
 
   const chartData = useMemo(() => {
@@ -69,7 +69,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ players, assignments
     return list;
   }, [metrics, players, settings.maxConsecutiveInfield]);
 
-  const suggestions = useMemo(() => suggestSwapsForFairness(players, assignments, gameLog), [players, assignments, gameLog]);
+  const suggestions = useMemo(() => suggestSwapsForFairness(players, assignments), [players, assignments]);
 
   return (
     <div className="p-6 space-y-8 max-w-6xl mx-auto">
@@ -131,14 +131,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ players, assignments
             </div>
             <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Innings</p>
-              <p className="text-2xl font-bold text-slate-800">
-                {gameLog ? gameLog.actualInnings : assignments.innings}
-                {gameLog && gameLog.actualInnings !== assignments.innings && (
-                  <span className="text-sm text-slate-400 font-normal ml-2">
-                    (of {assignments.innings})
-                  </span>
-                )}
-              </p>
+              <p className="text-2xl font-bold text-slate-800">{assignments.innings}</p>
             </div>
           </div>
         </>
