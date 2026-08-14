@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, LogOut, ArrowRight, Users } from "lucide-react";
+import { Plus, LogOut, ArrowRight, KeyRound, Users } from "lucide-react";
 
 type Team = {
   id: string;
@@ -85,13 +85,22 @@ export const Dashboard: React.FC = () => {
             <h1 className="text-3xl font-black text-slate-900">Dashboard</h1>
             <p className="text-slate-500 mt-1">Choose a team or create a new one.</p>
           </div>
-          <button
-            onClick={logout}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100"
-          >
-            <LogOut size={16} />
-            Logout
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/account/password"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100"
+            >
+              <KeyRound size={16} />
+              Password
+            </Link>
+            <button
+              onClick={logout}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100"
+            >
+              <LogOut size={16} />
+              Logout
+            </button>
+          </div>
         </header>
 
         <form onSubmit={createTeam} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm mb-8">

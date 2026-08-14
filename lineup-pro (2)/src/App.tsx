@@ -5,6 +5,7 @@ import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
 import { Dashboard } from './components/Dashboard';
 import { TeamView } from './components/TeamView';
+import { ChangePasswordPage } from './components/ChangePasswordPage';
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/account/password" element={<ChangePasswordPage />} />
         <Route path="/team/:teamId" element={<TeamView />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -416,6 +416,58 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
+app.post("/api/auth/change-password", auth, async (req: AuthedRequest, res) => {
+  const currentPassword = String(req.body?.currentPassword || "");
+  const newPassword = String(req.body?.newPassword || "");
+
+  if (!currentPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: "Your current password and a new password with 6+ characters are required." });
+  }
+
+  try {
+    let user: User | null = null;
+
+    if (USE_SUPABASE) {
+      const { data, error } = await supabase!.from("users").select("*").eq("id", req.userId!).maybeSingle();
+      if (error) throw error;
+      if (data) user = mapUserRow(data as DbUserRow);
+    } else {
+      user = users.get(req.userId!) || null;
+    }
+
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+    const currentPasswordIsValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!currentPasswordIsValid) {
+      return res.status(401).json({ error: "Your current password is incorrect." });
+    }
+
+    const isSamePassword = await bcrypt.compare(newPassword, user.passwordHash);
+    if (isSamePassword) {
+      return res.status(400).json({ error: "Choose a password different from your current password." });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    if (USE_SUPABASE) {
+      const { error } = await supabase!
+        .from("users")
+        .update({ password_hash: passwordHash })
+        .eq("id", user.id);
+      if (error) throw error;
+    } else {
+      users.set(user.id, { ...user, passwordHash });
+      await persistStore();
+    }
+
+    // Refresh the current session after a successful credential change.
+    setAuthCookie(res, user.id);
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("Password change failed", error);
+    return res.status(500).json({ error: "Unable to change password right now." });
+  }
+});
+
 app.get("/api/auth/me", auth, async (req: AuthedRequest, res) => {
   try {
     if (USE_SUPABASE) {
