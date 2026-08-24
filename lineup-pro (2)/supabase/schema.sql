@@ -52,3 +52,33 @@ alter table public.users disable row level security;
 alter table public.teams disable row level security;
 alter table public.games disable row level security;
 alter table public.drafts disable row level security;
+
+-- Cloudflare Workers has a small free CPU budget. Keep bcrypt work in Postgres
+-- so existing password hashes continue to work without exposing them to clients.
+create or replace function public.hash_lineup_password(p_password text)
+returns text
+language sql
+security definer
+set search_path = public, extensions
+as $$
+  select crypt(p_password, gen_salt('bf', 10));
+$$;
+
+create or replace function public.verify_lineup_password(p_email text, p_password text)
+returns table (id uuid, name text, email text)
+language sql
+security definer
+set search_path = public, extensions
+stable
+as $$
+  select u.id, u.name, u.email
+  from public.users u
+  where lower(u.email) = lower(trim(p_email))
+    and u.password_hash = crypt(p_password, u.password_hash)
+  limit 1;
+$$;
+
+revoke all on function public.hash_lineup_password(text) from public;
+revoke all on function public.verify_lineup_password(text, text) from public;
+grant execute on function public.hash_lineup_password(text) to service_role;
+grant execute on function public.verify_lineup_password(text, text) to service_role;

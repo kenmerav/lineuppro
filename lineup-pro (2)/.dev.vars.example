@@ -1,0 +1,4 @@
+# Use production secrets in the Cloudflare dashboard. This file is only for local Worker testing.
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+JWT_SECRET=replace-with-a-long-random-secret
