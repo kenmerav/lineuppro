@@ -9,7 +9,12 @@ type Player = {
   number?: string;
   walkoutSongName?: string;
   walkoutSongDataUrl?: string;
+  appleMusicSongId?: string;
+  appleMusicSongUrl?: string;
+  appleMusicSongName?: string;
+  appleMusicArtistName?: string;
   walkoutStartSec?: number;
+  walkoutDurationSec?: number;
   color: string;
   active?: boolean;
 };
@@ -94,6 +99,9 @@ type Env = {
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   JWT_SECRET: string;
+  APPLE_MUSIC_TEAM_ID?: string;
+  APPLE_MUSIC_KEY_ID?: string;
+  APPLE_MUSIC_PRIVATE_KEY?: string;
   ASSETS: { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> };
 };
 
@@ -168,6 +176,52 @@ const mapDraftRow = (row: DbDraftRow): DraftGameState => ({
 });
 
 const body = async (request: Request): Promise<Record<string, any>> => request.json().catch(() => ({}));
+
+const base64UrlEncode = (value: string | Uint8Array) => {
+  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+};
+
+const appleMusicDeveloperToken = async (env: Env, origin: string) => {
+  const teamId = env.APPLE_MUSIC_TEAM_ID;
+  const keyId = env.APPLE_MUSIC_KEY_ID;
+  const privateKey = env.APPLE_MUSIC_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  if (!teamId || !keyId || !privateKey) return null;
+
+  const keyBody = privateKey
+    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
+    .replace(/-----END PRIVATE KEY-----/g, "")
+    .replace(/\s/g, "");
+  const der = Uint8Array.from(atob(keyBody), (character) => character.charCodeAt(0));
+  const signingKey = await crypto.subtle.importKey(
+    "pkcs8",
+    der,
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"]
+  );
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const header = base64UrlEncode(JSON.stringify({ alg: "ES256", kid: keyId }));
+  // Apple accepts developer tokens valid for up to six months.
+  const payload = base64UrlEncode(JSON.stringify({
+    iss: teamId,
+    iat: issuedAt,
+    exp: issuedAt + 15552000,
+    // Limit this browser token to the Lineup Pro address that requested it.
+    origin: [origin],
+  }));
+  const signingInput = `${header}.${payload}`;
+  const signature = new Uint8Array(await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    signingKey,
+    new TextEncoder().encode(signingInput)
+  ));
+  return `${signingInput}.${base64UrlEncode(signature)}`;
+};
 
 const setAuthCookie = async (c: any, userId: string) => {
   const token = await sign({ sub: userId, exp: Math.floor(Date.now() / 1000) + SESSION_SECONDS }, c.env.JWT_SECRET, "HS256");
@@ -332,6 +386,19 @@ app.get("/api/auth/me", auth, async (c) => {
 app.post("/api/auth/logout", (c) => {
   deleteCookie(c, TOKEN_COOKIE, { path: "/" });
   return c.body(null, 204);
+});
+
+app.get("/api/apple-music/developer-token", auth, async (c) => {
+  try {
+    const developerToken = await appleMusicDeveloperToken(c.env, new URL(c.req.url).origin);
+    if (!developerToken) {
+      return c.json({ error: "Apple Music has not been configured for this app yet." }, 503);
+    }
+    return c.json({ developerToken });
+  } catch (error) {
+    console.error("Apple Music developer token failed", error);
+    return c.json({ error: "Apple Music could not be configured. Check the Worker secrets." }, 500);
+  }
 });
 
 app.get("/api/teams", auth, async (c) => {

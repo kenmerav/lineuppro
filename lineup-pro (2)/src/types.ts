@@ -4,7 +4,12 @@ export interface Player {
   number?: string;
   walkoutSongName?: string;
   walkoutSongDataUrl?: string;
+  appleMusicSongId?: string;
+  appleMusicSongUrl?: string;
+  appleMusicSongName?: string;
+  appleMusicArtistName?: string;
   walkoutStartSec?: number;
+  walkoutDurationSec?: number;
   color: string;
   active?: boolean;
 }

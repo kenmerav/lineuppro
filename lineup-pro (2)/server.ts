@@ -17,7 +17,12 @@ type Player = {
   number?: string;
   walkoutSongName?: string;
   walkoutSongDataUrl?: string;
+  appleMusicSongId?: string;
+  appleMusicSongUrl?: string;
+  appleMusicSongName?: string;
+  appleMusicArtistName?: string;
   walkoutStartSec?: number;
+  walkoutDurationSec?: number;
   color: string;
   active?: boolean;
 };
@@ -488,6 +493,28 @@ app.get("/api/auth/me", auth, async (req: AuthedRequest, res) => {
 app.post("/api/auth/logout", (_req, res) => {
   res.clearCookie(TOKEN_COOKIE);
   return res.status(204).end();
+});
+
+app.get("/api/apple-music/developer-token", auth, (req: AuthedRequest, res) => {
+  const teamId = process.env.APPLE_MUSIC_TEAM_ID;
+  const keyId = process.env.APPLE_MUSIC_KEY_ID;
+  const privateKey = process.env.APPLE_MUSIC_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  if (!teamId || !keyId || !privateKey) {
+    return res.status(503).json({ error: "Apple Music has not been configured for this app yet." });
+  }
+
+  try {
+    const origin = `${req.protocol}://${req.get("host")}`;
+    const developerToken = jwt.sign(
+      { iss: teamId, origin: [origin] },
+      privateKey,
+      { algorithm: "ES256", keyid: keyId, expiresIn: "180d" }
+    );
+    return res.json({ developerToken });
+  } catch (error) {
+    console.error("Apple Music developer token failed", error);
+    return res.status(500).json({ error: "Apple Music could not be configured. Check the server secrets." });
+  }
 });
 
 app.get("/api/teams", auth, async (req: AuthedRequest, res) => {
