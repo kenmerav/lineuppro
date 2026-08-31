@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Users, Edit2, Check, X, Upload, Music2, Link2 } from 'lucide-react';
+import { Plus, Trash2, Users, Edit2, Check, X, Upload, Music2, Link2, ClipboardPaste } from 'lucide-react';
 import { Player } from '../types';
 
 import { cn } from '../lib/utils';
@@ -26,6 +26,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editNumber, setEditNumber] = useState('');
+  const [appleMusicLinkInputs, setAppleMusicLinkInputs] = useState<Record<string, string>>({});
 
   const handleAdd = () => {
     if (newName.trim()) {
@@ -103,6 +104,33 @@ export const RosterTab: React.FC<RosterTabProps> = ({
       appleMusicSongUrl: songUrl,
       appleMusicSongName: player.appleMusicSongName || 'Apple Music song',
     });
+  };
+
+  const getAppleMusicLinkInput = (player: Player) => (
+    appleMusicLinkInputs[player.id] ?? player.appleMusicSongUrl ?? ''
+  );
+
+  const setAppleMusicLinkInput = (playerId: string, value: string) => {
+    setAppleMusicLinkInputs((previous) => ({ ...previous, [playerId]: value }));
+  };
+
+  const pasteAppleMusicLink = async (player: Player) => {
+    if (!navigator.clipboard?.readText) {
+      alert('Your browser does not allow direct paste here. Press and hold in the link box, then choose Paste.');
+      return;
+    }
+
+    try {
+      const link = await navigator.clipboard.readText();
+      if (!link.trim()) {
+        alert('Your clipboard is empty. In Apple Music, tap Share Song, then Copy Link.');
+        return;
+      }
+      setAppleMusicLinkInput(player.id, link);
+      saveAppleMusicLink(player, link);
+    } catch {
+      alert('Apple blocked direct clipboard access. Press and hold in the link box, then choose Paste.');
+    }
   };
 
   return (
@@ -272,7 +300,8 @@ export const RosterTab: React.FC<RosterTabProps> = ({
               <div className="flex items-center gap-2">
                 <input
                   type="url"
-                  defaultValue={player.appleMusicSongUrl || ''}
+                  value={getAppleMusicLinkInput(player)}
+                  onChange={(event) => setAppleMusicLinkInput(player.id, event.target.value)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') {
                       event.preventDefault();
@@ -283,14 +312,18 @@ export const RosterTab: React.FC<RosterTabProps> = ({
                   className="min-w-0 flex-1 p-1.5 border border-slate-200 rounded-lg text-xs text-slate-700"
                 />
                 <button
-                  onClick={(event) => {
-                    const input = event.currentTarget.parentElement?.querySelector('input');
-                    saveAppleMusicLink(player, input?.value || '');
-                  }}
+                  onClick={() => void pasteAppleMusicLink(player)}
+                  className="shrink-0 inline-flex items-center gap-1 bg-slate-100 text-slate-700 hover:bg-slate-200 px-2 py-1.5 rounded-lg text-[11px] font-bold"
+                  title="Paste an Apple Music link from your clipboard"
+                >
+                  <ClipboardPaste size={12} /> Paste
+                </button>
+                <button
+                  onClick={() => saveAppleMusicLink(player, getAppleMusicLinkInput(player))}
                   className="shrink-0 inline-flex items-center gap-1 bg-rose-50 text-rose-700 hover:bg-rose-100 px-2 py-1.5 rounded-lg text-[11px] font-bold"
                   title="Save Apple Music song"
                 >
-                  <Link2 size={12} /> Apple Music
+                  <Link2 size={12} /> Save
                 </button>
               </div>
 
