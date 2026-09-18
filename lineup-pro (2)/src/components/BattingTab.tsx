@@ -17,14 +17,15 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Hash, Save, Play, Square, Music2 } from 'lucide-react';
-import { Player, DefenseAssignments } from '../types';
-import { ALL_POSITIONS } from '../constants';
+import { Player, DefenseAssignments, Settings } from '../types';
+import { getAllPositions } from '../constants';
 import { authorizeAppleMusic } from '../lib/appleMusic';
 
 interface BattingTabProps {
   players: Player[];
   battingOrder: string[];
   assignments: DefenseAssignments;
+  settings: Settings;
   onReorder: (newOrder: string[]) => void;
   onSaveAsGame: () => Promise<void>;
 }
@@ -34,11 +35,12 @@ interface SortableItemProps {
   player: Player;
   index: number;
   assignments: DefenseAssignments;
+  settings: Settings;
   playingPlayerId: string | null;
   onPlayWalkout: (player: Player) => void;
 }
 
-const SortableItem: React.FC<SortableItemProps> = ({ id, player, index, assignments, playingPlayerId, onPlayWalkout }) => {
+const SortableItem: React.FC<SortableItemProps> = ({ id, player, index, assignments, settings, playingPlayerId, onPlayWalkout }) => {
   const {
     attributes,
     listeners,
@@ -58,7 +60,7 @@ const SortableItem: React.FC<SortableItemProps> = ({ id, player, index, assignme
     const inning = assignments.byInning[inningNum];
     if (!inning) return '-';
     
-    for (const pos of ALL_POSITIONS) {
+    for (const pos of getAllPositions(settings)) {
       if (inning[pos] === player.id) return pos;
     }
     
@@ -138,7 +140,7 @@ const SortableItem: React.FC<SortableItemProps> = ({ id, player, index, assignme
   );
 };
 
-export const BattingTab: React.FC<BattingTabProps> = ({ players, battingOrder, assignments, onReorder, onSaveAsGame }) => {
+export const BattingTab: React.FC<BattingTabProps> = ({ players, battingOrder, assignments, settings, onReorder, onSaveAsGame }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const walkoutStopTimerRef = useRef<number | null>(null);
   const appleMusicRef = useRef<Awaited<ReturnType<typeof authorizeAppleMusic>> | null>(null);
@@ -276,6 +278,7 @@ export const BattingTab: React.FC<BattingTabProps> = ({ players, battingOrder, a
                   player={player} 
                   index={index} 
                   assignments={assignments}
+                  settings={settings}
                   playingPlayerId={playingPlayerId}
                   onPlayWalkout={handlePlayWalkout}
                 />

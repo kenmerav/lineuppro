@@ -1,9 +1,11 @@
 import React from "react";
-import { DefenseAssignments, Player } from "../types";
+import { DefenseAssignments, Player, Settings } from "../types";
+import { getAdditionalPositions } from "../constants";
 
 interface DefensiveFieldDiagramProps {
   assignments: DefenseAssignments;
   players: Player[];
+  settings: Settings;
   inning: number;
   title?: string;
   className?: string;
@@ -29,6 +31,7 @@ const POSITIONS = ["LF", "LCF", "RCF", "RF", "3B", "SS", "2B", "1B", "P", "C"];
 export const DefensiveFieldDiagram: React.FC<DefensiveFieldDiagramProps> = ({
   assignments,
   players,
+  settings,
   inning,
   title,
   className = "",
@@ -38,6 +41,23 @@ export const DefensiveFieldDiagram: React.FC<DefensiveFieldDiagramProps> = ({
   const playerMap = new Map(players.map((player) => [player.id, player]));
   const inningAssignments = assignments.byInning[inning] || { dugout: [] };
   const dugout = inningAssignments.dugout || [];
+  const additionalPositions = getAdditionalPositions(settings);
+  const additionalLayouts: Record<string, { x: number; y: number }> = {};
+  const extraInfield = additionalPositions.filter((position) => position.group === "INFIELD");
+  const extraOutfield = additionalPositions.filter((position) => position.group === "OUTFIELD");
+
+  extraInfield.forEach((position, index) => {
+    const placements = [{ x: 42, y: 72 }, { x: 58, y: 72 }, { x: 50, y: 56 }, { x: 42, y: 56 }, { x: 58, y: 56 }];
+    additionalLayouts[position.id] = placements[index] || { x: 50, y: Math.max(18, 52 - index * 4) };
+  });
+  extraOutfield.forEach((position, index) => {
+    const count = extraOutfield.length;
+    additionalLayouts[position.id] = {
+      x: 10 + ((index + 1) * 80) / (count + 1),
+      y: index % 2 === 0 ? 18 : 27,
+    };
+  });
+  const positions = [...POSITIONS, ...additionalPositions.map((position) => position.id)];
 
   return (
     <div className={`rounded-2xl border border-slate-200 bg-white p-4 ${className}`}>
@@ -59,8 +79,8 @@ export const DefensiveFieldDiagram: React.FC<DefensiveFieldDiagramProps> = ({
           <polygon points="50,63 51.4,61.6 50,60.2 48.6,61.6" fill="none" stroke="#9ca3af" strokeWidth="0.6" />
         </svg>
 
-        {POSITIONS.map((pos) => {
-          const placement = POSITION_LAYOUT[pos];
+        {positions.map((pos) => {
+          const placement = POSITION_LAYOUT[pos] || additionalLayouts[pos];
           const playerId = inningAssignments[pos];
           const player = playerId ? playerMap.get(playerId) : null;
           const isAbsent = player?.active === false;

@@ -19,6 +19,7 @@ type Player = {
   active?: boolean;
 };
 type TeamBranding = { teamName: string; logoDataUrl?: string; bannerColor?: string };
+type AdditionalDefensivePosition = { id: string; group: "INFIELD" | "OUTFIELD" };
 type Settings = {
   inningsCount: number;
   allowEmptyOutfield: boolean;
@@ -30,6 +31,7 @@ type Settings = {
   allowSamePositionBackToBack: boolean;
   preventDuplicatePositionInGame: boolean;
   requireEarlyInfieldByInning3: boolean;
+  additionalPositions: AdditionalDefensivePosition[];
   customRules: string[];
 };
 type Team = {
@@ -121,6 +123,7 @@ const DEFAULT_SETTINGS: Settings = {
   allowSamePositionBackToBack: false,
   preventDuplicatePositionInGame: true,
   requireEarlyInfieldByInning3: true,
+  additionalPositions: [],
   customRules: [],
 };
 

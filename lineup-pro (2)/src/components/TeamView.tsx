@@ -18,7 +18,7 @@ import { useAppState } from '../hooks/useAppState';
 import { Users, Hash, Shield, BarChart3, FolderOpen, Settings as SettingsIcon, Printer, Share2, ClipboardCheck, LayoutDashboard, Loader2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { POSITION_GROUPS } from '../constants';
+import { getAllPositions } from '../constants';
 
 type Tab = 'roster' | 'batting' | 'defense' | 'analytics' | 'postgame' | 'games' | 'settings';
 
@@ -130,7 +130,7 @@ ${Array.from({ length: assignments.innings }, (_, i) => {
     }
   };
 
-  const allFieldPositions = [...POSITION_GROUPS.INFIELD, ...POSITION_GROUPS.OUTFIELD];
+  const allFieldPositions = getAllPositions(settings);
   const getPlayerPositionForInning = (playerId: string, inningNum: number) => {
     const inning = assignments.byInning[inningNum];
     if (!inning) return '-';
@@ -223,6 +223,7 @@ ${Array.from({ length: assignments.innings }, (_, i) => {
                 players={players} 
                 battingOrder={battingOrder} 
                 assignments={assignments}
+                settings={settings}
                 onReorder={setBattingOrder} 
                 onSaveAsGame={handleSaveCurrentAsGame}
               />
@@ -336,6 +337,7 @@ ${Array.from({ length: assignments.innings }, (_, i) => {
             <DefensiveFieldDiagram
               assignments={assignments}
               players={players}
+              settings={settings}
               inning={selectedInning}
               title={`Field - Inning ${selectedInning}`}
               className="print:border-slate-300 w-full max-w-none mx-auto"

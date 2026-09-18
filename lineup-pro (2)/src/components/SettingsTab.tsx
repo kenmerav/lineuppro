@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Settings as SettingsIcon, ShieldCheck, Layout, Info, Plus, X } from 'lucide-react';
-import { Settings } from '../types';
+import { DefensivePositionGroup, Settings } from '../types';
+import { getAllPositions } from '../constants';
 
 interface SettingsTabProps {
   settings: Settings;
@@ -9,6 +10,8 @@ interface SettingsTabProps {
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) => {
   const [newRule, setNewRule] = useState('');
+  const [newPosition, setNewPosition] = useState('');
+  const [newPositionGroup, setNewPositionGroup] = useState<DefensivePositionGroup>('OUTFIELD');
 
   const handleChange = (key: keyof Settings, value: any) => {
     onUpdate({ ...settings, [key]: value });
@@ -35,6 +38,27 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
   const removeCustomRule = (rule: string) => {
     const current = Array.isArray(settings.customRules) ? settings.customRules : [];
     handleChange('customRules', current.filter(r => r !== rule));
+  };
+
+  const addDefensivePosition = () => {
+    const id = newPosition.trim().toUpperCase();
+    if (!/^[A-Z0-9 -]{1,12}$/.test(id)) {
+      alert('Use 1-12 letters, numbers, spaces, or dashes for a position name.');
+      return;
+    }
+    if (getAllPositions(settings).includes(id)) {
+      alert(`${id} is already a defensive position.`);
+      return;
+    }
+    handleChange('additionalPositions', [
+      ...(settings.additionalPositions || []),
+      { id, group: newPositionGroup },
+    ]);
+    setNewPosition('');
+  };
+
+  const removeDefensivePosition = (id: string) => {
+    handleChange('additionalPositions', (settings.additionalPositions || []).filter((position) => position.id !== id));
   };
 
   return (
@@ -86,6 +110,59 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
                   +
                 </button>
               </div>
+            </div>
+
+            <div className="border-t border-slate-50 pt-4 space-y-3">
+              <div>
+                <p className="font-bold text-slate-700">Additional Defensive Positions</p>
+                <p className="text-xs text-slate-400">Add slots such as P2 for a second pitcher or OF5 for a fifth outfielder. They are included in auto-generate, fairness, and printing.</p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  value={newPosition}
+                  onChange={(event) => setNewPosition(event.target.value.toUpperCase().slice(0, 12))}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      addDefensivePosition();
+                    }
+                  }}
+                  placeholder="Example: P2 or OF5"
+                  className="flex-1 p-2 border border-slate-200 rounded-lg uppercase focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+                <select
+                  value={newPositionGroup}
+                  onChange={(event) => setNewPositionGroup(event.target.value as DefensivePositionGroup)}
+                  className="p-2 border border-slate-200 rounded-lg bg-white text-sm font-semibold text-slate-700"
+                  aria-label="Position group"
+                >
+                  <option value="INFIELD">Infield</option>
+                  <option value="OUTFIELD">Outfield</option>
+                </select>
+                <button
+                  onClick={addDefensivePosition}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700"
+                >
+                  <Plus size={16} /> Add Position
+                </button>
+              </div>
+              {(settings.additionalPositions || []).length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {settings.additionalPositions.map((position) => (
+                    <span key={position.id} className="inline-flex items-center gap-2 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-bold text-indigo-700">
+                      {position.id} <span className="text-indigo-400">{position.group === 'INFIELD' ? 'Infield' : 'Outfield'}</span>
+                      <button
+                        onClick={() => removeDefensivePosition(position.id)}
+                        className="text-indigo-400 hover:text-red-600"
+                        title={`Remove ${position.id}`}
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

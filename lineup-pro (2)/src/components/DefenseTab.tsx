@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Shield, AlertCircle, CheckCircle2, RefreshCw, Trash2, ChevronLeft, ChevronRight, UserPlus, LayoutGrid, Map as MapIcon, Save } from 'lucide-react';
 import { Player, DefenseAssignments, Settings } from '../types';
-import { POSITION_GROUPS, ALL_POSITIONS } from '../constants';
+import { getAllPositions, getPositionGroups } from '../constants';
 import { validateAll, autoFixViolations } from '../utils';
 import { cn, getContrastColor } from '../lib/utils';
 import { DefensiveFieldDiagram } from './DefensiveFieldDiagram';
@@ -32,6 +32,8 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
   const [selectedCell, setSelectedCell] = useState<{ inning: number; pos: string } | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'field'>('table');
   const validation = useMemo(() => validateAll(assignments, players, settings), [assignments, players, settings]);
+  const positionGroups = useMemo(() => getPositionGroups(settings), [settings]);
+  const allPositions = useMemo(() => getAllPositions(settings), [settings]);
 
   const handleInningsInputChange = (value: string) => {
     const parsed = Number.parseInt(value, 10);
@@ -58,7 +60,7 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
     } else {
       // Find where the new player was previously in this inning
       let oldPosOfNewPlayer: string | null = null;
-      for (const p of ALL_POSITIONS) {
+      for (const p of allPositions) {
         if (inning[p] === playerId) {
           oldPosOfNewPlayer = p;
           break;
@@ -260,6 +262,7 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
         <DefensiveFieldDiagram
           assignments={assignments}
           players={players}
+          settings={settings}
           inning={selectedInning}
           title={`Field View - Inning ${selectedInning}`}
         />
@@ -280,7 +283,7 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
               <tr>
                 <td colSpan={assignments.innings + 1} className="py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Infield</td>
               </tr>
-              {POSITION_GROUPS.INFIELD.map(pos => (
+              {positionGroups.INFIELD.map(pos => (
                 <tr key={pos}>
                   <td className="p-2 font-bold text-slate-600 text-sm">{pos}</td>
                   {Array.from({ length: assignments.innings }, (_, i) => {
@@ -316,7 +319,7 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
               <tr>
                 <td colSpan={assignments.innings + 1} className="py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Outfield</td>
               </tr>
-              {POSITION_GROUPS.OUTFIELD.map(pos => (
+              {positionGroups.OUTFIELD.map(pos => (
                 <tr key={pos}>
                   <td className="p-2 font-bold text-slate-600 text-sm">{pos}</td>
                   {Array.from({ length: assignments.innings }, (_, i) => {
@@ -421,7 +424,7 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
               {players.map(p => {
                 const currentInning = assignments.byInning[selectedCell.inning];
                 let currentPos = "Unassigned";
-                for (const pos of ALL_POSITIONS) {
+                for (const pos of allPositions) {
                   if (currentInning?.[pos] === p.id) {
                     currentPos = pos;
                     break;

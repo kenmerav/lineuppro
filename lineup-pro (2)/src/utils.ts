@@ -1,8 +1,8 @@
 import { Player, DefenseAssignments, Settings, ValidationResult, FairnessMetrics, Position, GameLog, SavedGame, SeasonFairnessMetrics } from "./types";
-import { POSITION_GROUPS, ALL_POSITIONS } from "./constants";
+import { getAllPositions, getPositionGroups, isInfieldPosition, isOutfieldPosition } from "./constants";
 
-export const isInfield = (pos: string) => POSITION_GROUPS.INFIELD.includes(pos);
-export const isOutfield = (pos: string) => POSITION_GROUPS.OUTFIELD.includes(pos);
+export const isInfield = (pos: string, settings?: Settings) => isInfieldPosition(pos, settings);
+export const isOutfield = (pos: string, settings?: Settings) => isOutfieldPosition(pos, settings);
 
 const POSITION_ALIASES: Record<Position, string[]> = {
   C: ["c", "catcher"],
@@ -46,8 +46,8 @@ const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$
 const hasWholePhrase = (text: string, phrase: string) =>
   new RegExp(`(?:^| )${escapeRegex(phrase)}(?: |$)`).test(text);
 
-const getRestrictedPositionsByPlayer = (players: Player[], settings: Settings): Map<string, Set<Position>> => {
-  const restricted = new Map<string, Set<Position>>();
+const getRestrictedPositionsByPlayer = (players: Player[], settings: Settings): Map<string, Set<string>> => {
+  const restricted = new Map<string, Set<string>>();
   const customRules = Array.isArray(settings.customRules) ? settings.customRules : [];
 
   for (const rawRule of customRules) {
@@ -78,7 +78,7 @@ const getRestrictedPositionsByPlayer = (players: Player[], settings: Settings): 
     if (restrictedPositions.length === 0) continue;
 
     matchingPlayers.forEach((player) => {
-      const existing = restricted.get(player.id) || new Set<Position>();
+      const existing = restricted.get(player.id) || new Set<string>();
       restrictedPositions.forEach((position) => existing.add(position));
       restricted.set(player.id, existing);
     });
@@ -87,11 +87,17 @@ const getRestrictedPositionsByPlayer = (players: Player[], settings: Settings): 
   return restricted;
 };
 
+const basePositionForRules = (position: string) => {
+  const normalized = position.toUpperCase().replace(/\s+/g, "");
+  const match = normalized.match(/^(LCF|RCF|1B|2B|3B|SS|LF|RF|C|P)\d+$/);
+  return match?.[1] || normalized;
+};
+
 const canPlayerPlayPosition = (
   playerId: string,
-  position: Position,
-  restrictedPositionsByPlayer: Map<string, Set<Position>>
-) => !restrictedPositionsByPlayer.get(playerId)?.has(position);
+  position: string,
+  restrictedPositionsByPlayer: Map<string, Set<string>>
+) => !restrictedPositionsByPlayer.get(playerId)?.has(basePositionForRules(position));
 
 const parseRuleNumber = (rule: string) => {
   const match = rule.match(/\b(\d+)\b/);
@@ -156,6 +162,8 @@ export const validateAll = (
   const warnings: string[] = [];
   const playerMap = new Map(players.map(p => [p.id, p]));
   const restrictedPositionsByPlayer = getRestrictedPositionsByPlayer(players, settings);
+  const positionGroups = getPositionGroups(effectiveSettings);
+  const allPositions = getAllPositions(effectiveSettings);
 
   // 1. Check for duplicates and unassigned positions
   for (let i = 1; i <= assignments.innings; i++) {
@@ -165,21 +173,21 @@ export const validateAll = (
     const assignedInInning = new Set<string>();
     
     // Check standard positions
-    ALL_POSITIONS.forEach(pos => {
+    allPositions.forEach(pos => {
       const pid = inning[pos];
       if (pid) {
         if (assignedInInning.has(pid)) {
           errors.push(`Inning ${i}: ${playerMap.get(pid)?.name || pid} appears multiple times.`);
         }
-        if (!canPlayerPlayPosition(pid, pos as Position, restrictedPositionsByPlayer)) {
+        if (!canPlayerPlayPosition(pid, pos, restrictedPositionsByPlayer)) {
           errors.push(
-            `Inning ${i}: ${playerMap.get(pid)?.name || pid} cannot play ${POSITION_LABELS[pos as Position]} because of a custom rule.`
+            `Inning ${i}: ${playerMap.get(pid)?.name || pid} cannot play ${POSITION_LABELS[basePositionForRules(pos) as Position] || pos} because of a custom rule.`
           );
         }
         assignedInInning.add(pid);
       } else {
         // Warning for unassigned positions
-        if (isInfield(pos)) {
+        if (isInfield(pos, effectiveSettings)) {
           errors.push(`Inning ${i}: ${pos} is unassigned.`);
         } else if (!effectiveSettings.allowEmptyOutfield) {
           errors.push(`Inning ${i}: ${pos} is unassigned.`);
@@ -213,7 +221,7 @@ export const validateAll = (
         players.forEach(p => {
           let currentPos = "";
           let prevPos = "";
-          for (const pos of ALL_POSITIONS) {
+          for (const pos of allPositions) {
             if (inning[pos] === p.id) currentPos = pos;
             if (prevInning[pos] === p.id) prevPos = pos;
           }
@@ -238,13 +246,13 @@ export const validateAll = (
       let playedInfield = false;
       let playedOutfield = false;
       
-      for (const pos of POSITION_GROUPS.INFIELD) {
+      for (const pos of positionGroups.INFIELD) {
         if (inning?.[pos] === player.id) {
           playedInfield = true;
           break;
         }
       }
-      for (const pos of POSITION_GROUPS.OUTFIELD) {
+      for (const pos of positionGroups.OUTFIELD) {
         if (inning?.[pos] === player.id) {
           playedOutfield = true;
           break;
@@ -276,7 +284,7 @@ export const validateAll = (
     for (let i = 1; i <= assignments.innings; i++) {
       const inning = assignments.byInning[i];
       if (!inning) continue;
-      for (const pos of ALL_POSITIONS) {
+      for (const pos of allPositions) {
         if (inning[pos] === player.id) {
           positionsPlayed.set(pos, (positionsPlayed.get(pos) || 0) + 1);
         }
@@ -313,14 +321,14 @@ export const validateAll = (
   // 5. Hard Rule: Everyone gets infield by inning 3 when mathematically possible.
   if (effectiveSettings.requireEarlyInfieldByInning3) {
     const firstThreeInnings = Math.min(3, assignments.innings);
-    const earlyInfieldSlots = firstThreeInnings * POSITION_GROUPS.INFIELD.length;
+    const earlyInfieldSlots = firstThreeInnings * positionGroups.INFIELD.length;
     if (players.length <= earlyInfieldSlots) {
       players.forEach((player) => {
         let hasEarlyInfield = false;
         for (let i = 1; i <= firstThreeInnings; i++) {
           const inning = assignments.byInning[i];
           if (!inning) continue;
-          if (POSITION_GROUPS.INFIELD.some((pos) => inning[pos] === player.id)) {
+          if (positionGroups.INFIELD.some((pos) => inning[pos] === player.id)) {
             hasEarlyInfield = true;
             break;
           }
@@ -338,9 +346,12 @@ export const validateAll = (
 export const computeFairness = (
   players: Player[] = [],
   assignments: DefenseAssignments,
-  gameLog?: GameLog
+  gameLog?: GameLog,
+  settings?: Settings
 ): FairnessMetrics => {
   const stats: FairnessMetrics["playerStats"] = {};
+  const positionGroups = getPositionGroups(settings);
+  const allPositions = getAllPositions(settings);
   
   // Filter for players who are actually part of this game's calculation
   const relevantPlayers = (players || []).filter(p => {
@@ -366,9 +377,9 @@ export const computeFairness = (
 
     relevantPlayers.forEach(p => {
       let found = false;
-      for (const pos of ALL_POSITIONS) {
+      for (const pos of allPositions) {
         if (inning[pos] === p.id) {
-          if (isInfield(pos)) stats[p.id].infield++;
+          if (isInfield(pos, settings)) stats[p.id].infield++;
           else stats[p.id].outfield++;
           stats[p.id].positions[pos] = (stats[p.id].positions[pos] || 0) + 1;
           found = true;
@@ -389,7 +400,7 @@ export const computeFairness = (
     for (let i = 1; i <= activeInnings; i++) {
       const inning = assignments.byInning[i];
       let isInfieldNow = false;
-      for (const pos of POSITION_GROUPS.INFIELD) {
+      for (const pos of positionGroups.INFIELD) {
         if (inning?.[pos] === p.id) {
           isInfieldNow = true;
           break;
@@ -444,7 +455,7 @@ export const computeSeasonFairness = (
   });
 
   savedGames.forEach(game => {
-    const gameMetrics = computeFairness(game.players, game.assignments, game.log);
+    const gameMetrics = computeFairness(game.players, game.assignments, game.log, game.settings);
     
     Object.entries(gameMetrics.playerStats).forEach(([pid, pStats]) => {
       if (!stats[pid]) {
@@ -499,6 +510,8 @@ export const autoGenerateDefense = (
 ): DefenseAssignments => {
   const effectiveSettings = applyCustomRuleText(settings);
   const restrictedPositionsByPlayer = getRestrictedPositionsByPlayer(players, settings);
+  const positionGroups = getPositionGroups(effectiveSettings);
+  const allPositions = getAllPositions(effectiveSettings);
   const createEmptyAssignments = (): DefenseAssignments => {
     const empty: DefenseAssignments = { innings: inningsCount, byInning: {} };
     for (let i = 1; i <= inningsCount; i++) empty.byInning[i] = { dugout: [] };
@@ -527,7 +540,7 @@ export const autoGenerateDefense = (
   const firstThreeInnings = Math.min(3, inningsCount);
   const enforceEarlyInfield = effectiveSettings.requireEarlyInfieldByInning3;
   const minimumMissingEarlyInfield = enforceEarlyInfield
-    ? Math.max(0, players.length - (firstThreeInnings * POSITION_GROUPS.INFIELD.length))
+    ? Math.max(0, players.length - (firstThreeInnings * positionGroups.INFIELD.length))
     : players.length;
   const MAX_ATTEMPTS = 160;
   let bestAssignments = createEmptyAssignments();
@@ -547,11 +560,12 @@ export const autoGenerateDefense = (
     for (let i = 1; i <= inningsCount; i++) {
       const inning = assignments.byInning[i];
       const assignedThisInning = new Set<string>();
-      const maxFieldSlots = Math.min(players.length, ALL_POSITIONS.length);
-      const outfieldSlots = Math.max(0, Math.min(POSITION_GROUPS.OUTFIELD.length, maxFieldSlots - POSITION_GROUPS.INFIELD.length));
+      const maxFieldSlots = Math.min(players.length, allPositions.length);
+      const infieldSlots = Math.min(positionGroups.INFIELD.length, maxFieldSlots);
+      const outfieldSlots = Math.max(0, Math.min(positionGroups.OUTFIELD.length, maxFieldSlots - infieldSlots));
       const positionsThisInning = [
-        ...POSITION_GROUPS.INFIELD,
-        ...POSITION_GROUPS.OUTFIELD.slice(0, outfieldSlots)
+        ...positionGroups.INFIELD.slice(0, infieldSlots),
+        ...positionGroups.OUTFIELD.slice(0, outfieldSlots)
       ];
 
       const orderedPlayers = [...players].sort((a, b) => {
@@ -571,11 +585,11 @@ export const autoGenerateDefense = (
       });
 
       const chooseCandidates = (pos: string): Player[] => {
-        const isPosInfield = isInfield(pos);
-        const isPosOutfield = isOutfield(pos);
+        const isPosInfield = isInfield(pos, effectiveSettings);
+        const isPosOutfield = isOutfield(pos, effectiveSettings);
         const hardCandidates = orderedPlayers.filter((p) => {
           if (assignedThisInning.has(p.id)) return false;
-          if (!canPlayerPlayPosition(p.id, pos as Position, restrictedPositionsByPlayer)) return false;
+          if (!canPlayerPlayPosition(p.id, pos, restrictedPositionsByPlayer)) return false;
           if (isPosInfield && (playerLastInfieldStreak.get(p.id) || 0) >= effectiveSettings.maxConsecutiveInfield) return false;
           if (isPosOutfield && (playerLastOutfieldStreak.get(p.id) || 0) >= effectiveSettings.maxConsecutiveOutfield) return false;
           if (!effectiveSettings.allowSamePositionBackToBack && playerLastPosition.get(p.id) === pos) return false;
@@ -610,7 +624,7 @@ export const autoGenerateDefense = (
       const assignPosition = (idx: number): boolean => {
         if (idx >= positionsThisInning.length) return true;
         const pos = positionsThisInning[idx];
-        const isRequired = isInfield(pos) || !effectiveSettings.allowEmptyOutfield;
+        const isRequired = isInfield(pos, effectiveSettings) || !effectiveSettings.allowEmptyOutfield;
         const candidates = chooseCandidates(pos);
 
         for (const candidate of candidates) {
@@ -642,18 +656,18 @@ export const autoGenerateDefense = (
         let playedPosition: string | null = null;
         let playedInfield = false;
         let playedOutfield = false;
-        for (const pos of ALL_POSITIONS) {
+        for (const pos of allPositions) {
           if (inning[pos] === p.id) {
             playedPosition = pos;
             break;
           }
         }
 
-        if (playedPosition && isInfield(playedPosition)) {
+        if (playedPosition && isInfield(playedPosition, effectiveSettings)) {
           playedInfield = true;
           if (i <= 3) playerEarlyInfield.set(p.id, true);
         }
-        if (playedPosition && isOutfield(playedPosition)) {
+        if (playedPosition && isOutfield(playedPosition, effectiveSettings)) {
           playedOutfield = true;
         }
 
@@ -713,6 +727,8 @@ export const autoFixViolations = (
   const activePlayers = players.filter(p => p.active !== false);
   const activePlayerIds = new Set(activePlayers.map(p => p.id));
   const restrictedPositionsByPlayer = getRestrictedPositionsByPlayer(activePlayers, settings);
+  const positionGroups = getPositionGroups(settings);
+  const allPositions = getAllPositions(settings);
 
   // 1. Remove absent players from positions and move to dugout (or just remove if dugout is full/not needed)
   for (let i = 1; i <= next.innings; i++) {
@@ -720,7 +736,7 @@ export const autoFixViolations = (
     if (!inning) continue;
 
     // Clean up positions: if player is not active, remove them
-    ALL_POSITIONS.forEach(pos => {
+    allPositions.forEach(pos => {
       const pid = inning[pos];
       if (pid && !activePlayerIds.has(pid)) {
         delete inning[pos];
@@ -731,11 +747,11 @@ export const autoFixViolations = (
     inning.dugout = (inning.dugout || []).filter(pid => activePlayerIds.has(pid));
 
     // 2. Fill holes from dugout
-    const requiredPositions = [...POSITION_GROUPS.INFIELD, ...POSITION_GROUPS.OUTFIELD];
+    const requiredPositions = [...positionGroups.INFIELD, ...positionGroups.OUTFIELD];
     requiredPositions.forEach(pos => {
       if (!inning[pos]) {
         const swapPid = inning.dugout.find((playerId) =>
-          canPlayerPlayPosition(playerId, pos as Position, restrictedPositionsByPlayer)
+          canPlayerPlayPosition(playerId, pos, restrictedPositionsByPlayer)
         );
         if (swapPid) {
           inning[pos] = swapPid;
@@ -746,7 +762,7 @@ export const autoFixViolations = (
 
     // 3. If still have holes and people are missing from this inning entirely, add them to dugout
     const assignedInInning = new Set<string>();
-    ALL_POSITIONS.forEach(pos => { if (inning[pos]) assignedInInning.add(inning[pos]); });
+    allPositions.forEach(pos => { if (inning[pos]) assignedInInning.add(inning[pos]); });
     inning.dugout.forEach(pid => assignedInInning.add(pid));
 
     activePlayers.forEach(p => {
@@ -762,7 +778,7 @@ export const autoFixViolations = (
     for (let i = 1; i <= next.innings; i++) {
       const inning = next.byInning[i];
       let posInfield: string | null = null;
-      for (const pos of POSITION_GROUPS.INFIELD) {
+      for (const pos of positionGroups.INFIELD) {
         if (inning[pos] === player.id) {
           posInfield = pos;
           break;
@@ -775,19 +791,19 @@ export const autoFixViolations = (
           // Violation at inning i. Swap this player with someone in the dugout or outfield
           const dugout = inning.dugout;
           const swapPid = dugout.find((candidateId) =>
-            canPlayerPlayPosition(candidateId, posInfield as Position, restrictedPositionsByPlayer)
+            canPlayerPlayPosition(candidateId, posInfield, restrictedPositionsByPlayer)
           );
           if (swapPid) {
             inning[posInfield] = swapPid;
             inning.dugout = [player.id, ...dugout.filter((candidateId) => candidateId !== swapPid)];
           } else {
             // Try outfield
-            for (const outPos of POSITION_GROUPS.OUTFIELD) {
+            for (const outPos of positionGroups.OUTFIELD) {
               const outPid = inning[outPos];
               if (
                 outPid &&
-                canPlayerPlayPosition(outPid, posInfield as Position, restrictedPositionsByPlayer) &&
-                canPlayerPlayPosition(player.id, outPos as Position, restrictedPositionsByPlayer)
+                canPlayerPlayPosition(outPid, posInfield, restrictedPositionsByPlayer) &&
+                canPlayerPlayPosition(player.id, outPos, restrictedPositionsByPlayer)
               ) {
                 inning[posInfield] = outPid;
                 inning[outPos] = player.id;
@@ -809,7 +825,7 @@ export const autoFixViolations = (
     for (let i = 1; i <= next.innings; i++) {
       const inning = next.byInning[i];
       let posOutfield: string | null = null;
-      for (const pos of POSITION_GROUPS.OUTFIELD) {
+      for (const pos of positionGroups.OUTFIELD) {
         if (inning[pos] === player.id) {
           posOutfield = pos;
           break;
@@ -822,19 +838,19 @@ export const autoFixViolations = (
           // Violation at inning i. Swap this player with someone in the dugout or infield
           const dugout = inning.dugout;
           const swapPid = dugout.find((candidateId) =>
-            canPlayerPlayPosition(candidateId, posOutfield as Position, restrictedPositionsByPlayer)
+            canPlayerPlayPosition(candidateId, posOutfield, restrictedPositionsByPlayer)
           );
           if (swapPid) {
             inning[posOutfield] = swapPid;
             inning.dugout = [player.id, ...dugout.filter((candidateId) => candidateId !== swapPid)];
           } else {
             // Try infield
-            for (const inPos of POSITION_GROUPS.INFIELD) {
+            for (const inPos of positionGroups.INFIELD) {
               const inPid = inning[inPos];
               if (
                 inPid &&
-                canPlayerPlayPosition(inPid, posOutfield as Position, restrictedPositionsByPlayer) &&
-                canPlayerPlayPosition(player.id, inPos as Position, restrictedPositionsByPlayer)
+                canPlayerPlayPosition(inPid, posOutfield, restrictedPositionsByPlayer) &&
+                canPlayerPlayPosition(player.id, inPos, restrictedPositionsByPlayer)
               ) {
                 inning[posOutfield] = inPid;
                 inning[inPos] = player.id;
@@ -856,7 +872,7 @@ export const autoFixViolations = (
     for (let i = 1; i <= next.innings; i++) {
       const inning = next.byInning[i];
       let currentPos: string | null = null;
-      for (const pos of ALL_POSITIONS) {
+      for (const pos of allPositions) {
         if (inning[pos] === player.id) {
           currentPos = pos;
           break;
@@ -868,7 +884,7 @@ export const autoFixViolations = (
           // Duplicate! Swap with someone in the dugout
           const dugout = inning.dugout;
           const swapPid = dugout.find((candidateId) =>
-            canPlayerPlayPosition(candidateId, currentPos as Position, restrictedPositionsByPlayer)
+            canPlayerPlayPosition(candidateId, currentPos, restrictedPositionsByPlayer)
           );
           if (swapPid) {
             inning[currentPos] = swapPid;
@@ -887,9 +903,10 @@ export const autoFixViolations = (
 export const suggestSwapsForFairness = (
   players: Player[],
   assignments: DefenseAssignments,
-  gameLog?: GameLog
+  gameLog?: GameLog,
+  settings?: Settings
 ): string[] => {
-  const metrics = computeFairness(players, assignments, gameLog);
+  const metrics = computeFairness(players, assignments, gameLog, settings);
   const suggestions: string[] = [];
   
   const stats = Object.entries(metrics.playerStats).map(([id, s]) => ({ id, ...s }));

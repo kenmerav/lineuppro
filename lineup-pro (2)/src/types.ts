@@ -34,6 +34,13 @@ export interface TeamBranding {
   bannerColor?: string;
 }
 
+export type DefensivePositionGroup = "INFIELD" | "OUTFIELD";
+
+export interface AdditionalDefensivePosition {
+  id: string;
+  group: DefensivePositionGroup;
+}
+
 export interface Settings {
   inningsCount: number;
   allowEmptyOutfield: boolean;
@@ -45,6 +52,7 @@ export interface Settings {
   allowSamePositionBackToBack: boolean;
   preventDuplicatePositionInGame: boolean;
   requireEarlyInfieldByInning3: boolean;
+  additionalPositions: AdditionalDefensivePosition[];
   customRules: string[];
 }
 

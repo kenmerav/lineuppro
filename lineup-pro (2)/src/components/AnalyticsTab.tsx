@@ -15,7 +15,7 @@ interface AnalyticsTabProps {
 
 export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ players, assignments, settings, gameLog, savedGames }) => {
   const [view, setView] = useState<'current' | 'season'>('current');
-  const metrics = useMemo(() => computeFairness(players, assignments), [players, assignments]);
+  const metrics = useMemo(() => computeFairness(players, assignments, undefined, settings), [players, assignments, settings]);
   const seasonMetrics = useMemo(() => computeSeasonFairness(savedGames, players), [savedGames, players]);
 
   const chartData = useMemo(() => {
@@ -69,7 +69,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ players, assignments
     return list;
   }, [metrics, players, settings.maxConsecutiveInfield]);
 
-  const suggestions = useMemo(() => suggestSwapsForFairness(players, assignments), [players, assignments]);
+  const suggestions = useMemo(() => suggestSwapsForFairness(players, assignments, undefined, settings), [players, assignments, settings]);
 
   return (
     <div className="p-6 space-y-8 max-w-6xl mx-auto">
