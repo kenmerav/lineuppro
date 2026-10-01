@@ -77,10 +77,13 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
         // Assigning to a specific position
         if (oldPosOfNewPlayer) {
           // Player was at another position -> swap
-          if (currentPlayerAtPos) {
+          if (currentPlayerAtPos && settings.strictSwap) {
             inning[oldPosOfNewPlayer] = currentPlayerAtPos;
           } else {
             delete inning[oldPosOfNewPlayer];
+            if (currentPlayerAtPos && !inning.dugout.includes(currentPlayerAtPos)) {
+              inning.dugout = [...inning.dugout, currentPlayerAtPos];
+            }
           }
         } else if (wasInDugout) {
           // Player was in dugout
