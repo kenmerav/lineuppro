@@ -154,9 +154,11 @@ const applyCustomRuleText = (settings: Settings): Settings => {
 
 export const validateAll = (
   assignments: DefenseAssignments,
-  players: Player[],
+  roster: Player[],
   settings: Settings
 ): ValidationResult => {
+  const players = roster.filter(player => player.active !== false);
+  const absentPlayerIds = new Set(roster.filter(player => player.active === false).map(player => player.id));
   const effectiveSettings = applyCustomRuleText(settings);
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -175,6 +177,7 @@ export const validateAll = (
     // Check standard positions
     allPositions.forEach(pos => {
       const pid = inning[pos];
+      if (absentPlayerIds.has(pid)) return;
       if (pid) {
         if (assignedInInning.has(pid)) {
           errors.push(`Inning ${i}: ${playerMap.get(pid)?.name || pid} appears multiple times.`);
@@ -197,6 +200,7 @@ export const validateAll = (
 
     // Check dugout
     inning.dugout.forEach(pid => {
+      if (absentPlayerIds.has(pid)) return;
       if (assignedInInning.has(pid)) {
         errors.push(`Inning ${i}: ${playerMap.get(pid)?.name || pid} appears in dugout and a position.`);
       }
@@ -210,7 +214,8 @@ export const validateAll = (
       }
     });
 
-    if (effectiveSettings.requireDugout && players.length >= 10 && inning.dugout.length === 0) {
+    const presentDugoutCount = inning.dugout.filter(pid => !absentPlayerIds.has(pid)).length;
+    if (effectiveSettings.requireDugout && players.length >= 10 && presentDugoutCount === 0) {
       warnings.push(`Inning ${i}: No players are in the dugout despite roster size.`);
     }
 
