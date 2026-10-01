@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Users, Edit2, Check, X, Upload, Music2, Link2, ClipboardPaste } from 'lucide-react';
+import { Plus, Trash2, Users, Edit2, Check, X } from 'lucide-react';
 import { Player } from '../types';
 
 import { cn } from '../lib/utils';
-import { appleMusicSongIdFromUrl } from '../lib/appleMusic';
 
 interface RosterTabProps {
   players: Player[];
@@ -18,7 +17,6 @@ interface RosterTabProps {
 export const RosterTab: React.FC<RosterTabProps> = ({ 
   players, onAdd, onBulkAdd, onUpdate, onDelete, onSaveAsMaster, onLoadMaster 
 }) => {
-  const MAX_WALKOUT_FILE_BYTES = 6 * 1024 * 1024;
   const [newName, setNewName] = useState('');
   const [newNumber, setNewNumber] = useState('');
   const [bulkNames, setBulkNames] = useState('');
@@ -26,7 +24,6 @@ export const RosterTab: React.FC<RosterTabProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editNumber, setEditNumber] = useState('');
-  const [appleMusicLinkInputs, setAppleMusicLinkInputs] = useState<Record<string, string>>({});
 
   const handleAdd = () => {
     if (newName.trim()) {
@@ -58,80 +55,6 @@ export const RosterTab: React.FC<RosterTabProps> = ({
   };
 
   const activeCount = players.filter(p => p.active !== false).length;
-
-  const handleWalkoutUpload = (playerId: string, file?: File) => {
-    if (!file) return;
-    if (!file.type.startsWith('audio/')) {
-      alert('Please choose an audio file.');
-      return;
-    }
-    if (file.size > MAX_WALKOUT_FILE_BYTES) {
-      alert('Walkout file is too large. Please keep files under 6MB.');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      onUpdate(playerId, {
-        walkoutSongDataUrl: reader.result as string,
-        walkoutSongName: file.name
-      });
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const sanitizeStartSeconds = (value: string) => {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric) || numeric < 0) return 0;
-    return Math.round(numeric * 10) / 10;
-  };
-
-  const sanitizeDurationSeconds = (value: string) => {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric) || numeric <= 0) return 20;
-    return Math.min(120, Math.round(numeric * 10) / 10);
-  };
-
-  const saveAppleMusicLink = (player: Player, value: string) => {
-    const songUrl = value.trim();
-    const songId = appleMusicSongIdFromUrl(songUrl);
-    if (!songId) {
-      alert('Paste an Apple Music song link. In Apple Music, use Share Song, then Copy Link.');
-      return;
-    }
-    onUpdate(player.id, {
-      appleMusicSongId: songId,
-      appleMusicSongUrl: songUrl,
-      appleMusicSongName: player.appleMusicSongName || 'Apple Music song',
-    });
-  };
-
-  const getAppleMusicLinkInput = (player: Player) => (
-    appleMusicLinkInputs[player.id] ?? player.appleMusicSongUrl ?? ''
-  );
-
-  const setAppleMusicLinkInput = (playerId: string, value: string) => {
-    setAppleMusicLinkInputs((previous) => ({ ...previous, [playerId]: value }));
-  };
-
-  const pasteAppleMusicLink = async (player: Player) => {
-    if (!navigator.clipboard?.readText) {
-      alert('Your browser does not allow direct paste here. Press and hold in the link box, then choose Paste.');
-      return;
-    }
-
-    try {
-      const link = await navigator.clipboard.readText();
-      if (!link.trim()) {
-        alert('Your clipboard is empty. In Apple Music, tap Share Song, then Copy Link.');
-        return;
-      }
-      setAppleMusicLinkInput(player.id, link);
-      saveAppleMusicLink(player, link);
-    } catch {
-      alert('Apple blocked direct clipboard access. Press and hold in the link box, then choose Paste.');
-    }
-  };
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
@@ -292,102 +215,6 @@ export const RosterTab: React.FC<RosterTabProps> = ({
                       <Trash2 size={16} />
                     </button>
                   </>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-3 border-t border-slate-100 pt-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <input
-                  type="url"
-                  value={getAppleMusicLinkInput(player)}
-                  onChange={(event) => setAppleMusicLinkInput(player.id, event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      saveAppleMusicLink(player, event.currentTarget.value);
-                    }
-                  }}
-                  placeholder="Paste Apple Music song link"
-                  className="min-w-0 flex-1 p-1.5 border border-slate-200 rounded-lg text-xs text-slate-700"
-                />
-                <button
-                  onClick={() => void pasteAppleMusicLink(player)}
-                  className="shrink-0 inline-flex items-center gap-1 bg-slate-100 text-slate-700 hover:bg-slate-200 px-2 py-1.5 rounded-lg text-[11px] font-bold"
-                  title="Paste an Apple Music link from your clipboard"
-                >
-                  <ClipboardPaste size={12} /> Paste
-                </button>
-                <button
-                  onClick={() => saveAppleMusicLink(player, getAppleMusicLinkInput(player))}
-                  className="shrink-0 inline-flex items-center gap-1 bg-rose-50 text-rose-700 hover:bg-rose-100 px-2 py-1.5 rounded-lg text-[11px] font-bold"
-                  title="Save Apple Music song"
-                >
-                  <Link2 size={12} /> Save
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between gap-2">
-                <label className="inline-flex items-center gap-2 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg px-2.5 py-1.5 cursor-pointer">
-                  <Upload size={12} />
-                  Upload Walkout
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      handleWalkoutUpload(player.id, e.target.files?.[0]);
-                      e.currentTarget.value = '';
-                    }}
-                  />
-                </label>
-
-                <div className="inline-flex items-center gap-1">
-                  <span className="text-[11px] text-slate-500 font-semibold">Start</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.1"
-                    value={player.walkoutStartSec ?? 0}
-                    onChange={(e) => onUpdate(player.id, { walkoutStartSec: sanitizeStartSeconds(e.target.value) })}
-                    className="w-16 p-1 border border-slate-200 rounded text-xs font-semibold text-slate-700"
-                  />
-                  <span className="text-[11px] text-slate-500 font-semibold">sec</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-1">
-                <span className="text-[11px] text-slate-500 font-semibold">Play for</span>
-                <input
-                  type="number"
-                  min={0.1}
-                  max={120}
-                  step="0.1"
-                  value={player.walkoutDurationSec ?? 20}
-                  onChange={(e) => onUpdate(player.id, { walkoutDurationSec: sanitizeDurationSeconds(e.target.value) })}
-                  className="w-16 p-1 border border-slate-200 rounded text-xs font-semibold text-slate-700"
-                />
-                <span className="text-[11px] text-slate-500 font-semibold">sec</span>
-              </div>
-
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 flex items-center gap-1.5 text-[11px] text-slate-500">
-                  <Music2 size={12} />
-                  <span className="truncate">
-                    {player.appleMusicSongId
-                      ? player.appleMusicSongName || 'Apple Music song linked'
-                      : player.walkoutSongName || 'No walkout song selected'}
-                  </span>
-                </div>
-                {(player.appleMusicSongId || player.walkoutSongDataUrl) && (
-                  <button
-                    onClick={() => onUpdate(player.id, player.appleMusicSongId
-                      ? { appleMusicSongId: undefined, appleMusicSongUrl: undefined, appleMusicSongName: undefined, appleMusicArtistName: undefined }
-                      : { walkoutSongDataUrl: undefined, walkoutSongName: undefined })}
-                    className="text-[11px] font-semibold text-red-600 hover:text-red-700"
-                  >
-                    Remove {player.appleMusicSongId ? 'Apple Music' : 'upload'}
-                  </button>
                 )}
               </div>
             </div>

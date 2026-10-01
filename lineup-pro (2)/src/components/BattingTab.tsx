@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import {
   DndContext,
   closestCenter,
@@ -16,10 +16,9 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Hash, Save, Play, Square, Music2 } from 'lucide-react';
+import { GripVertical, Hash, Save } from 'lucide-react';
 import { Player, DefenseAssignments, Settings } from '../types';
 import { getAllPositions } from '../constants';
-import { authorizeAppleMusic } from '../lib/appleMusic';
 
 interface BattingTabProps {
   players: Player[];
@@ -36,11 +35,9 @@ interface SortableItemProps {
   index: number;
   assignments: DefenseAssignments;
   settings: Settings;
-  playingPlayerId: string | null;
-  onPlayWalkout: (player: Player) => void;
 }
 
-const SortableItem: React.FC<SortableItemProps> = ({ id, player, index, assignments, settings, playingPlayerId, onPlayWalkout }) => {
+const SortableItem: React.FC<SortableItemProps> = ({ id, player, index, assignments, settings }) => {
   const {
     attributes,
     listeners,
@@ -91,22 +88,6 @@ const SortableItem: React.FC<SortableItemProps> = ({ id, player, index, assignme
           <span className="font-semibold text-slate-800 min-w-[120px]">
             {player.number ? `#${player.number} ` : ''}{player.name}
           </span>
-          <button
-            onClick={() => onPlayWalkout(player)}
-            disabled={!player.walkoutSongDataUrl && !player.appleMusicSongId}
-            className={`
-              inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition-colors
-              ${player.walkoutSongDataUrl || player.appleMusicSongId
-                ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                : 'bg-slate-100 text-slate-400 cursor-not-allowed'}
-            `}
-            title={player.appleMusicSongId
-              ? `Play ${player.appleMusicSongName || 'Apple Music walkout'}`
-              : player.walkoutSongDataUrl ? `Play ${player.walkoutSongName || 'walkout song'}` : 'No walkout song selected'}
-          >
-            {playingPlayerId === player.id ? <Square size={12} /> : <Play size={12} />}
-            <Music2 size={12} />
-          </button>
         </div>
 
         {/* Defensive Positions */}
@@ -141,11 +122,6 @@ const SortableItem: React.FC<SortableItemProps> = ({ id, player, index, assignme
 };
 
 export const BattingTab: React.FC<BattingTabProps> = ({ players, battingOrder, assignments, settings, onReorder, onSaveAsGame }) => {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const walkoutStopTimerRef = useRef<number | null>(null);
-  const appleMusicRef = useRef<Awaited<ReturnType<typeof authorizeAppleMusic>> | null>(null);
-  const [playingPlayerId, setPlayingPlayerId] = useState<string | null>(null);
-
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -164,84 +140,6 @@ export const BattingTab: React.FC<BattingTabProps> = ({ players, battingOrder, a
   };
 
   const playerMap = new Map(players.map(p => [p.id, p]));
-
-  const stopCurrentAudio = () => {
-    if (walkoutStopTimerRef.current !== null) {
-      window.clearTimeout(walkoutStopTimerRef.current);
-      walkoutStopTimerRef.current = null;
-    }
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current = null;
-    }
-    if (appleMusicRef.current) {
-      void appleMusicRef.current.stop().catch(() => undefined);
-      appleMusicRef.current = null;
-    }
-    setPlayingPlayerId(null);
-  };
-
-  const scheduleWalkoutStop = (durationSeconds: number) => {
-    walkoutStopTimerRef.current = window.setTimeout(() => {
-      stopCurrentAudio();
-    }, durationSeconds * 1000);
-  };
-
-  const handlePlayWalkout = async (player: Player) => {
-    if (!player.walkoutSongDataUrl && !player.appleMusicSongId) return;
-
-    if (playingPlayerId === player.id) {
-      stopCurrentAudio();
-      return;
-    }
-
-    stopCurrentAudio();
-
-    const startAt = Math.max(0, player.walkoutStartSec || 0);
-    const duration = Math.max(0.1, player.walkoutDurationSec || 20);
-
-    if (player.appleMusicSongId) {
-      try {
-        setPlayingPlayerId(player.id);
-        const music = await authorizeAppleMusic();
-        appleMusicRef.current = music;
-        await music.setQueue({ song: player.appleMusicSongId, startTime: startAt });
-        await music.play();
-        scheduleWalkoutStop(duration);
-      } catch (error) {
-        console.error('Apple Music walkout failed', error);
-        stopCurrentAudio();
-        alert(error instanceof Error ? error.message : 'Apple Music could not start this song.');
-      }
-      return;
-    }
-
-    const audio = new Audio(player.walkoutSongDataUrl!);
-    audioRef.current = audio;
-    setPlayingPlayerId(player.id);
-
-    audio.addEventListener('loadedmetadata', () => {
-      const maxSafeStart = Number.isFinite(audio.duration) ? Math.max(0, audio.duration - 0.1) : startAt;
-      audio.currentTime = Math.min(startAt, maxSafeStart);
-      void audio.play().then(() => scheduleWalkoutStop(duration)).catch(() => setPlayingPlayerId(null));
-    });
-    audio.addEventListener('ended', () => setPlayingPlayerId(null));
-    audio.addEventListener('pause', () => {
-      if (audio.currentTime === 0 || audio.ended) setPlayingPlayerId(null);
-    });
-  };
-
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      if (walkoutStopTimerRef.current !== null) window.clearTimeout(walkoutStopTimerRef.current);
-      if (appleMusicRef.current) void appleMusicRef.current.stop().catch(() => undefined);
-    };
-  }, []);
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
@@ -279,8 +177,6 @@ export const BattingTab: React.FC<BattingTabProps> = ({ players, battingOrder, a
                   index={index} 
                   assignments={assignments}
                   settings={settings}
-                  playingPlayerId={playingPlayerId}
-                  onPlayWalkout={handlePlayWalkout}
                 />
               );
             })}
