@@ -77,6 +77,18 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
           </div>
           
           <div className="space-y-4">
+            <label className="flex flex-col gap-2 font-bold text-slate-700">Sport
+              <select aria-label="Sport" value={settings.sport || "softball"} onChange={e => handleChange("sport", e.target.value)} className="rounded-xl border border-slate-200 p-3">
+                <option value="softball">Softball (existing four-outfielder layout)</option>
+                <option value="baseball">Baseball (nine fielders, including CF)</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-2 font-bold text-slate-700">Batting format
+              <select aria-label="Batting format" value={settings.battingFormat || "continuous"} onChange={e => handleChange("battingFormat", e.target.value)} className="rounded-xl border border-slate-200 p-3">
+                <option value="continuous">Continuous batting order</option>
+                <option value="standard">Standard batting order</option>
+              </select>
+            </label>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-bold text-slate-700">Innings Count</p>
