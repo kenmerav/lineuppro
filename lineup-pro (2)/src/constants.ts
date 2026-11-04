@@ -18,7 +18,7 @@ const isValidAdditionalPosition = (position: unknown): position is AdditionalDef
 };
 
 export const getAdditionalPositions = (settings?: Pick<Settings, "additionalPositions">) => {
-  const seen = new Set(ALL_POSITIONS);
+  const seen = new Set([...ALL_POSITIONS, "CF"]);
   return (settings?.additionalPositions || []).reduce<AdditionalDefensivePosition[]>((positions, position) => {
     if (!isValidAdditionalPosition(position)) return positions;
     const id = position.id.trim().toUpperCase();
@@ -32,7 +32,7 @@ export const getAdditionalPositions = (settings?: Pick<Settings, "additionalPosi
 export const getPositionGroups = (settings?: Pick<Settings, "additionalPositions">) => {
   const groups = {
     INFIELD: [...POSITION_GROUPS.INFIELD],
-    OUTFIELD: [...POSITION_GROUPS.OUTFIELD],
+    OUTFIELD: settings?.sport === "baseball" ? ["LF", "CF", "RF"] : [...POSITION_GROUPS.OUTFIELD],
   };
   getAdditionalPositions(settings).forEach((position) => {
     groups[position.group].push(position.id);
@@ -59,6 +59,8 @@ export const PLAYER_COLORS = [
 
 export const DEFAULT_SETTINGS = {
   inningsCount: 5,
+  sport: "softball" as const,
+  battingFormat: "continuous" as const,
   allowEmptyOutfield: true,
   requireDugout: true,
   strictSwap: true,
