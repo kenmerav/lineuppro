@@ -42,6 +42,8 @@ export interface AdditionalDefensivePosition {
 }
 
 export interface Settings {
+  sport?: "softball" | "baseball";
+  battingFormat?: "standard" | "continuous";
   inningsCount: number;
   allowEmptyOutfield: boolean;
   requireDugout: boolean;

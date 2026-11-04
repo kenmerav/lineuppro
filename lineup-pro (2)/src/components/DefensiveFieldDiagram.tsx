@@ -1,6 +1,6 @@
 import React from "react";
 import { DefenseAssignments, Player, Settings } from "../types";
-import { getAdditionalPositions } from "../constants";
+import { getAdditionalPositions, getAllPositions } from "../constants";
 
 interface DefensiveFieldDiagramProps {
   assignments: DefenseAssignments;
@@ -21,12 +21,11 @@ const POSITION_LAYOUT: Record<string, { x: number; y: number }> = {
   SS: { x: 36, y: 48 },
   "3B": { x: 29, y: 62 },
   LF: { x: 16, y: 38 },
+  CF: { x: 50, y: 26 },
   LCF: { x: 35, y: 26 },
   RCF: { x: 65, y: 26 },
   RF: { x: 84, y: 38 },
 };
-
-const POSITIONS = ["LF", "LCF", "RCF", "RF", "3B", "SS", "2B", "1B", "P", "C"];
 
 export const DefensiveFieldDiagram: React.FC<DefensiveFieldDiagramProps> = ({
   assignments,
@@ -57,7 +56,7 @@ export const DefensiveFieldDiagram: React.FC<DefensiveFieldDiagramProps> = ({
       y: index % 2 === 0 ? 18 : 27,
     };
   });
-  const positions = [...POSITIONS, ...additionalPositions.map((position) => position.id)];
+  const positions = getAllPositions(settings);
 
   return (
     <div className={`rounded-2xl border border-slate-200 bg-white p-4 ${className}`}>

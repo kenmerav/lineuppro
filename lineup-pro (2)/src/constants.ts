@@ -1,5 +1,6 @@
 import type { AdditionalDefensivePosition, Settings } from "./types";
 
+// Legacy softball defaults remain unchanged for teams without a sport setting.
 export const POSITION_GROUPS = {
   INFIELD: ["C", "P", "1B", "2B", "SS", "3B"],
   OUTFIELD: ["LF", "LCF", "RCF", "RF"],
@@ -11,13 +12,17 @@ export const ALL_POSITIONS = [
   ...POSITION_GROUPS.OUTFIELD,
 ];
 
+type PositionSettings = Pick<Settings, "additionalPositions" | "sport">;
+
 const isValidAdditionalPosition = (position: unknown): position is AdditionalDefensivePosition => {
   if (!position || typeof position !== "object") return false;
   const { id, group } = position as AdditionalDefensivePosition;
   return typeof id === "string" && (group === "INFIELD" || group === "OUTFIELD");
 };
 
-export const getAdditionalPositions = (settings?: Pick<Settings, "additionalPositions">) => {
+export const getAdditionalPositions = (settings?: PositionSettings) => {
+  // Keep custom softball positions saved, but never add a tenth baseball fielder.
+  if (settings?.sport === "baseball") return [] as AdditionalDefensivePosition[];
   const seen = new Set(ALL_POSITIONS);
   return (settings?.additionalPositions || []).reduce<AdditionalDefensivePosition[]>((positions, position) => {
     if (!isValidAdditionalPosition(position)) return positions;
@@ -29,10 +34,10 @@ export const getAdditionalPositions = (settings?: Pick<Settings, "additionalPosi
   }, []);
 };
 
-export const getPositionGroups = (settings?: Pick<Settings, "additionalPositions">) => {
+export const getPositionGroups = (settings?: PositionSettings) => {
   const groups = {
     INFIELD: [...POSITION_GROUPS.INFIELD],
-    OUTFIELD: [...POSITION_GROUPS.OUTFIELD],
+    OUTFIELD: settings?.sport === "baseball" ? ["LF", "CF", "RF"] : [...POSITION_GROUPS.OUTFIELD],
   };
   getAdditionalPositions(settings).forEach((position) => {
     groups[position.group].push(position.id);
@@ -40,15 +45,15 @@ export const getPositionGroups = (settings?: Pick<Settings, "additionalPositions
   return groups;
 };
 
-export const getAllPositions = (settings?: Pick<Settings, "additionalPositions">) => {
+export const getAllPositions = (settings?: PositionSettings) => {
   const groups = getPositionGroups(settings);
   return [...groups.INFIELD, ...groups.OUTFIELD];
 };
 
-export const isInfieldPosition = (position: string, settings?: Pick<Settings, "additionalPositions">) =>
+export const isInfieldPosition = (position: string, settings?: PositionSettings) =>
   getPositionGroups(settings).INFIELD.includes(position);
 
-export const isOutfieldPosition = (position: string, settings?: Pick<Settings, "additionalPositions">) =>
+export const isOutfieldPosition = (position: string, settings?: PositionSettings) =>
   getPositionGroups(settings).OUTFIELD.includes(position);
 
 export const PLAYER_COLORS = [
@@ -59,6 +64,8 @@ export const PLAYER_COLORS = [
 
 export const DEFAULT_SETTINGS = {
   inningsCount: 5,
+  sport: "softball" as const,
+  battingFormat: "continuous" as const,
   allowEmptyOutfield: true,
   requireDugout: true,
   strictSwap: true,

@@ -1,0 +1,38 @@
+name: Validate Lineup Pro
+
+on:
+  push:
+    branches: [main, feature/baseball-lineup-cards]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: 'lineup-pro (2)'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: 'lineup-pro (2)/package-lock.json'
+      - run: npm ci
+      - name: TypeScript
+        run: npm run lint
+      - name: Regression tests
+        if: success() || failure()
+        run: npm test
+      - name: Production build
+        if: success() || failure()
+        run: npm run build
