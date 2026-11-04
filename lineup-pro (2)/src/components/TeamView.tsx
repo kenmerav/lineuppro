@@ -14,6 +14,7 @@ import { PostGameTab } from './PostGameTab';
 import { GamesTab } from './GamesTab';
 import { SettingsTab } from './SettingsTab';
 import { DefensiveFieldDiagram } from './DefensiveFieldDiagram';
+import { BaseballLineupCard } from './BaseballLineupCard';
 import { useAppState } from '../hooks/useAppState';
 import { Users, Hash, Shield, BarChart3, FolderOpen, Settings as SettingsIcon, Printer, Share2, ClipboardCheck, LayoutDashboard, Loader2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -281,6 +282,7 @@ ${Array.from({ length: assignments.innings }, (_, i) => {
       </main>
 
       {/* Print View Overlay (Hidden normally) */}
+      {settings.sport === "baseball" && <div className="hidden print:block fixed inset-0 z-[110] bg-white"><BaseballLineupCard players={players} battingOrder={battingOrder} assignments={assignments} branding={branding} settings={settings} /></div>}
       <div className="hidden print:block fixed inset-0 bg-white z-[100] p-0 overflow-hidden">
         <div className="h-full w-full flex flex-col gap-2 px-3 py-2">
         <div className="flex flex-col items-center mb-1">
