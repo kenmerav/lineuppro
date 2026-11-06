@@ -15,6 +15,7 @@ import { GamesTab } from './GamesTab';
 import { SettingsTab } from './SettingsTab';
 import { DefensiveFieldDiagram } from './DefensiveFieldDiagram';
 import { BaseballLineupCard } from './BaseballLineupCard';
+import { PaperScoreSheet } from './PaperScoreSheet';
 import { useAppState } from '../hooks/useAppState';
 import { Users, Hash, Shield, BarChart3, FolderOpen, Settings as SettingsIcon, Printer, Share2, ClipboardCheck, LayoutDashboard, Loader2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -23,12 +24,14 @@ import { getAllPositions } from '../constants';
 import { getBattingLineupIds } from '../utils';
 
 type Tab = 'roster' | 'batting' | 'defense' | 'analytics' | 'postgame' | 'games' | 'settings';
+type PrintMode = 'lineup' | 'scorebook' | null;
 
 export const TeamView: React.FC = () => {
   const { teamId } = useParams<{ teamId: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('roster');
   const [selectedInning, setSelectedInning] = useState(1);
+  const [printMode, setPrintMode] = useState<PrintMode>(null);
   const {
     players, battingOrder, assignments, settings, branding, savedGames, gameLog, loading, activeGameId, syncStatus,
     setBattingOrder, setAssignments, setSettings, updateInningsCount, setBranding, setGameLog,
@@ -50,6 +53,17 @@ export const TeamView: React.FC = () => {
       setSelectedInning(assignments.innings || 1);
     }
   }, [assignments.innings, selectedInning]);
+
+  useEffect(() => {
+    if (!printMode) return;
+    const resetPrintMode = () => setPrintMode(null);
+    window.addEventListener('afterprint', resetPrintMode);
+    const frame = window.requestAnimationFrame(() => window.print());
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('afterprint', resetPrintMode);
+    };
+  }, [printMode]);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -79,7 +93,7 @@ export const TeamView: React.FC = () => {
   };
 
   const handlePrint = () => {
-    window.print();
+    setPrintMode('lineup');
   };
 
   const handleShare = () => {
@@ -282,6 +296,7 @@ ${defenseText}
                 onStartNewGame={handleStartNewGameFromLog}
                 onDeleteCurrentGame={handleDeleteCurrentGame}
                 syncStatus={syncStatus}
+                onPrintPaperScoreSheet={() => setPrintMode('scorebook')}
               />
             )}
             {activeTab === 'games' && (
@@ -307,8 +322,9 @@ ${defenseText}
       </main>
 
       {/* Print View Overlay (Hidden normally) */}
-      {settings.sport === "baseball" && <div className="hidden print:block fixed inset-0 z-[110] bg-white"><BaseballLineupCard players={players} battingOrder={battingOrder} assignments={assignments} branding={branding} settings={settings} /></div>}
-      <div className="hidden print:block fixed inset-0 bg-white z-[100] p-0 overflow-hidden">
+      {printMode === 'scorebook' && <PaperScoreSheet players={players} battingOrder={battingOrder} assignments={assignments} settings={settings} branding={branding} gameMeta={activeGame?.meta} ourSide={gameLog?.ourSide} />}
+      {printMode === 'lineup' && settings.sport === "baseball" && <div className="hidden print:block fixed inset-0 z-[110] bg-white"><BaseballLineupCard players={players} battingOrder={battingOrder} assignments={assignments} branding={branding} settings={settings} /></div>}
+      {printMode === 'lineup' && <div className="hidden print:block fixed inset-0 bg-white z-[100] p-0 overflow-hidden">
         <div className="h-full w-full flex flex-col gap-2 px-3 py-2">
         <div className="flex flex-col items-center mb-1">
           {branding.logoDataUrl && (
@@ -377,7 +393,7 @@ ${defenseText}
           </div>
         </div>
         </div>
-      </div>
+      </div>}
 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-4 px-6 text-center text-xs text-slate-400 print:hidden">

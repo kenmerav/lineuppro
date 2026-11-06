@@ -8,6 +8,7 @@ import {
   CloudOff,
   ListOrdered,
   LoaderCircle,
+  FileText,
   Minus,
   Play,
   Plus,
@@ -63,6 +64,7 @@ interface PostGameTabProps {
   onStartNewGame: () => void;
   onDeleteCurrentGame?: () => Promise<void>;
   syncStatus?: SyncStatus;
+  onPrintPaperScoreSheet?: () => void;
 }
 
 const OUTCOMES: Array<{ value: PlateAppearanceOutcome; label: string }> = [
@@ -96,6 +98,7 @@ export const PostGameTab: React.FC<PostGameTabProps> = ({
   onStartNewGame,
   onDeleteCurrentGame,
   syncStatus = 'saved',
+  onPrintPaperScoreSheet,
 }) => {
   const [log, setLog] = useState<NormalizedGameLog>(() => normalizeGameLog(gameLog, players, assignments));
   const [view, setView] = useState<'live' | 'stats' | 'plays'>('live');
@@ -342,6 +345,7 @@ export const PostGameTab: React.FC<PostGameTabProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button onClick={onPrintPaperScoreSheet} disabled={!onPrintPaperScoreSheet} className="inline-flex h-10 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 disabled:text-slate-300"><FileText size={15} /> Paper Score Sheet</button>
           <button onClick={() => setConfirmAction('new')} className="inline-flex h-10 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700"><Plus size={15} /> New Game</button>
           <button onClick={() => setConfirmAction('delete')} disabled={!onDeleteCurrentGame} className="inline-flex h-10 items-center gap-1.5 rounded-md border border-red-200 bg-white px-3 text-sm font-bold text-red-600 disabled:border-slate-200 disabled:text-slate-300"><Trash2 size={15} /> Delete Game</button>
           <div className="inline-flex w-fit rounded-lg border border-slate-200 bg-white p-1">

@@ -31,4 +31,19 @@
   .print-hidden {
     display: none !important;
   }
+  .paper-score-print {
+    position: absolute;
+    inset: 0;
+    z-index: 200;
+    display: block !important;
+    width: 100%;
+  }
+  .paper-score-page {
+    break-after: page;
+    page-break-after: always;
+  }
+  .paper-score-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
 }
