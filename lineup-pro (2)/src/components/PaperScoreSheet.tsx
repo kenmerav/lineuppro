@@ -18,7 +18,8 @@ interface PaperScoreSheetProps {
   ourSide?: 'home' | 'away';
 }
 
-const PLATE_APPEARANCES = 6;
+const PLATE_APPEARANCES = 5;
+const PITCH_SLOTS = 8;
 const SCORE_INNINGS = 7;
 
 const BlankLines = ({ count }: { count: number }) => (
@@ -65,7 +66,7 @@ const ScoreGrid = ({
   <div>
     <div className="mb-1 flex items-end justify-between">
       <h2 className="text-sm font-black uppercase">{title}</h2>
-      <p className="text-[8px] font-bold text-slate-600">In each PA box write inning above result, for example: 2 / 1B</p>
+      <p className="text-[8px] font-bold text-slate-600">Mark each pitch B or S, then write the inning and result.</p>
     </div>
     <table className="w-full table-fixed border-collapse text-[8px]">
       <thead>
@@ -83,13 +84,23 @@ const ScoreGrid = ({
       <tbody>
         {rows.map((row, index) => (
           <tr key={row.id}>
-            <td className="h-8 border border-slate-900 text-center font-bold">{index + 1}</td>
+            <td className="h-10 border border-slate-900 text-center font-bold">{index + 1}</td>
             <td className="border border-slate-900 text-center text-[10px] font-bold">{row.number || ''}</td>
             <td className="border border-slate-900 px-2 text-[10px] font-semibold">{opponent ? '' : row.name}</td>
             <td className="border border-slate-900 text-center text-[10px] font-bold">{opponent ? '' : row.position}</td>
             {Array.from({ length: PLATE_APPEARANCES }, (_, paIndex) => (
-              <td key={paIndex} className="relative border border-slate-900 align-top">
-                <span className="absolute left-1 top-0.5 text-[6px] font-bold text-slate-400">INN / RESULT</span>
+              <td key={paIndex} className="border border-slate-900 p-0.5 align-top">
+                <div className="mb-0.5 flex justify-between text-[5px] font-black text-slate-500">
+                  <span>INN ____</span><span>RESULT ______</span>
+                </div>
+                {(['B', 'S'] as const).map((call) => (
+                  <div key={call} className="mb-px grid items-center gap-px" style={{ gridTemplateColumns: `8px repeat(${PITCH_SLOTS}, minmax(0, 1fr))` }}>
+                    <span className="text-[6px] font-black">{call}</span>
+                    {Array.from({ length: PITCH_SLOTS }, (_, pitchIndex) => (
+                      <span key={pitchIndex} title={`Pitch ${pitchIndex + 1} ${call === 'B' ? 'ball' : 'strike'}`} className="h-2 border border-slate-500" />
+                    ))}
+                  </div>
+                ))}
               </td>
             ))}
             <td className="border border-slate-900" />
@@ -150,7 +161,7 @@ const SheetFooter = ({ opponent = false }: { opponent?: boolean }) => (
     </section>
     <section>
       <h3 className="mb-1 font-black uppercase">Notes / unusual plays</h3>
-      <BlankLines count={opponent ? 4 : 5} />
+      <BlankLines count={opponent ? 3 : 4} />
     </section>
     {!opponent && <p className="col-span-3 border-t border-slate-400 pt-1 text-[7px] font-bold text-slate-600">
       RESULT KEY: K strikeout · BB walk · HBP hit by pitch · 1B single · 2B double · 3B triple · HR home run · E1-E9 error · FC fielder's choice · SAC sacrifice · OUT or fielding play (example 6-3). Circle the result when a run scores and write RBI total at right.
@@ -177,9 +188,9 @@ export const PaperScoreSheet: React.FC<PaperScoreSheetProps> = ({
       const player = playerMap.get(id);
       return { id, number: player?.number, name: player?.name, position: positionFor(id) };
     }),
-    ...Array.from({ length: Math.max(3, 12 - battingIds.length) }, (_, index) => ({ id: `our-blank-${index}` })),
+    ...Array.from({ length: Math.max(1, 10 - battingIds.length) }, (_, index) => ({ id: `our-blank-${index}` })),
   ];
-  const opponentRows = Array.from({ length: 12 }, (_, index) => ({ id: `opponent-${index}` }));
+  const opponentRows = Array.from({ length: 10 }, (_, index) => ({ id: `opponent-${index}` }));
   const opponentName = gameMeta?.opponent?.trim() || '________________________';
 
   return (
