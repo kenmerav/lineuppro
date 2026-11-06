@@ -1,8 +1,28 @@
-import { Player, DefenseAssignments, Settings, ValidationResult, FairnessMetrics, Position, GameLog, SavedGame, SeasonFairnessMetrics } from "./types";
-import { getAllPositions, getPositionGroups, isInfieldPosition, isOutfieldPosition } from "./constants";
+import { Player, DefenseAssignments, InningAssignments, Settings, ValidationResult, FairnessMetrics, Position, GameLog, SavedGame, SeasonFairnessMetrics } from "./types";
+import { BATTING_ONLY_POSITIONS, getAllPositions, getPositionGroups, isInfieldPosition, isOutfieldPosition } from "./constants";
 
 export const isInfield = (pos: string, settings?: Settings) => isInfieldPosition(pos, settings);
 export const isOutfield = (pos: string, settings?: Settings) => isOutfieldPosition(pos, settings);
+
+export const getBattingEligiblePlayerIds = (assignments: DefenseAssignments, settings: Settings) => {
+  const firstInning = assignments.byInning[1] || { dugout: [] };
+  return new Set(
+    [...getAllPositions(settings), ...BATTING_ONLY_POSITIONS]
+      .map((position) => firstInning[position])
+      .filter((playerId): playerId is string => typeof playerId === "string" && playerId.length > 0),
+  );
+};
+
+export const getBattingLineupIds = (
+  battingOrder: string[],
+  settings: Settings,
+  assignments: DefenseAssignments,
+) => {
+  if (settings.sport !== "baseball") return battingOrder;
+  const battingCount = Math.max(1, Math.floor(settings.battingCount || 9));
+  const eligiblePlayerIds = getBattingEligiblePlayerIds(assignments, settings);
+  return battingOrder.filter((playerId) => eligiblePlayerIds.has(playerId)).slice(0, battingCount);
+};
 
 const POSITION_ALIASES: Record<Position, string[]> = {
   C: ["c", "catcher"],
@@ -161,6 +181,15 @@ export const validateAll = (
   const players = roster.filter(player => player.active !== false);
   const absentPlayerIds = new Set(roster.filter(player => player.active === false).map(player => player.id));
   const effectiveSettings = applyCustomRuleText(settings);
+  const usesFixedLineup = effectiveSettings.sport === "baseball";
+  if (usesFixedLineup) {
+    effectiveSettings.allowSamePositionBackToBack = true;
+    effectiveSettings.preventDuplicatePositionInGame = false;
+    effectiveSettings.requireEarlyInfieldByInning3 = false;
+    effectiveSettings.maxConsecutiveInfield = Number.MAX_SAFE_INTEGER;
+    effectiveSettings.maxConsecutiveOutfield = Number.MAX_SAFE_INTEGER;
+    effectiveSettings.maxConsecutiveBench = Number.MAX_SAFE_INTEGER;
+  }
   const errors: string[] = [];
   const warnings: string[] = [];
   const playerMap = new Map(players.map(p => [p.id, p]));
@@ -244,7 +273,7 @@ export const validateAll = (
   }
 
   // 2. Hard Rule: Max consecutive innings in infield/outfield
-  players.forEach(player => {
+  if (!usesFixedLineup) players.forEach(player => {
     let infieldStreak = 0;
     let outfieldStreak = 0;
     for (let i = 1; i <= assignments.innings; i++) {
@@ -285,7 +314,7 @@ export const validateAll = (
   });
 
   // 3. Rule: Same position more than once a game
-  players.forEach(player => {
+  if (!usesFixedLineup) players.forEach(player => {
     const positionsPlayed = new Map<string, number>();
     for (let i = 1; i <= assignments.innings; i++) {
       const inning = assignments.byInning[i];
@@ -456,7 +485,16 @@ export const computeSeasonFairness = (
       avgOutfieldPerGame: 0,
       avgBenchPerGame: 0,
       totalAB: 0,
-      avgABPerGame: 0
+      avgABPerGame: 0,
+      totalHits: 0,
+      totalRuns: 0,
+      totalRbi: 0,
+      totalWalks: 0,
+      totalStrikeouts: 0,
+      totalErrors: 0,
+      totalPitches: 0,
+      totalPitchingStrikeouts: 0,
+      totalWalksAllowed: 0
     };
   });
 
@@ -469,7 +507,10 @@ export const computeSeasonFairness = (
         stats[pid] = {
           totalInfield: 0, totalOutfield: 0, totalBench: 0, gamesPlayed: 0,
           avgInfieldPerGame: 0, avgOutfieldPerGame: 0, avgBenchPerGame: 0,
-          totalAB: 0, avgABPerGame: 0
+          totalAB: 0, avgABPerGame: 0,
+          totalHits: 0, totalRuns: 0, totalRbi: 0, totalWalks: 0,
+          totalStrikeouts: 0, totalErrors: 0, totalPitches: 0,
+          totalPitchingStrikeouts: 0, totalWalksAllowed: 0
         };
       }
       
@@ -479,7 +520,17 @@ export const computeSeasonFairness = (
       stats[pid].gamesPlayed += 1;
       
       if (game.log?.playerStats[pid]) {
-        stats[pid].totalAB += game.log.playerStats[pid].ab;
+        const logged = game.log.playerStats[pid];
+        stats[pid].totalAB += logged.ab;
+        stats[pid].totalHits += logged.hits || 0;
+        stats[pid].totalRuns += logged.runs || 0;
+        stats[pid].totalRbi += logged.rbi || 0;
+        stats[pid].totalWalks += logged.walks || 0;
+        stats[pid].totalStrikeouts += logged.strikeouts || 0;
+        stats[pid].totalErrors += logged.errors || 0;
+        stats[pid].totalPitches += logged.pitches || 0;
+        stats[pid].totalPitchingStrikeouts += logged.pitchingStrikeouts || 0;
+        stats[pid].totalWalksAllowed += logged.walksAllowed || 0;
       }
     });
   });
@@ -526,6 +577,30 @@ export const autoGenerateDefense = (
   };
 
   if (!players || players.length === 0) return createEmptyAssignments();
+
+  if (effectiveSettings.sport === "baseball") {
+    const availablePlayers = [...players];
+    const startingLineup: InningAssignments = { dugout: [] };
+
+    allPositions.forEach((position) => {
+      const playerIndex = availablePlayers.findIndex((player) =>
+        canPlayerPlayPosition(player.id, position, restrictedPositionsByPlayer)
+      );
+      if (playerIndex === -1) return;
+      const [player] = availablePlayers.splice(playerIndex, 1);
+      startingLineup[position] = player.id;
+    });
+    startingLineup.dugout = availablePlayers.map((player) => player.id);
+
+    const assignments = createEmptyAssignments();
+    for (let inning = 1; inning <= inningsCount; inning++) {
+      assignments.byInning[inning] = {
+        ...startingLineup,
+        dugout: [...startingLineup.dugout],
+      };
+    }
+    return assignments;
+  }
 
   // Gather historical positions from the last 2 games to encourage variety
   const historicalPositions = new Map<string, Set<string>>();

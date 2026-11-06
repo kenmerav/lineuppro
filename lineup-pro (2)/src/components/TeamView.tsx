@@ -20,6 +20,7 @@ import { Users, Hash, Shield, BarChart3, FolderOpen, Settings as SettingsIcon, P
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { getAllPositions } from '../constants';
+import { getBattingLineupIds } from '../utils';
 
 type Tab = 'roster' | 'batting' | 'defense' | 'analytics' | 'postgame' | 'games' | 'settings';
 
@@ -29,7 +30,7 @@ export const TeamView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('roster');
   const [selectedInning, setSelectedInning] = useState(1);
   const {
-    players, battingOrder, assignments, settings, branding, savedGames, gameLog, loading, activeGameId,
+    players, battingOrder, assignments, settings, branding, savedGames, gameLog, loading, activeGameId, syncStatus,
     setBattingOrder, setAssignments, setSettings, updateInningsCount, setBranding, setGameLog,
     addPlayer, bulkAddPlayers, updatePlayer, deletePlayer,
     saveGame, updateGame, loadGame, deleteGame, importGame, generateDefense,
@@ -64,10 +65,18 @@ export const TeamView: React.FC = () => {
     { id: 'batting', label: 'Batting', icon: Hash },
     { id: 'defense', label: 'Defense', icon: Shield },
     { id: 'analytics', label: 'Fairness', icon: BarChart3 },
-    { id: 'postgame', label: 'Results', icon: ClipboardCheck },
+    { id: 'postgame', label: 'Game Log', icon: ClipboardCheck },
     { id: 'games', label: 'Games', icon: FolderOpen },
     { id: 'settings', label: 'Settings', icon: SettingsIcon },
   ];
+  const activeGame = savedGames.find((game) => game.id === activeGameId);
+  const handleStartNewGameFromLog = () => startNewGame(true);
+  const handleDeleteCurrentGame = async () => {
+    if (activeGame) {
+        await deleteGame(activeGame.id);
+    }
+    startNewGame(true);
+  };
 
   const handlePrint = () => {
     window.print();
@@ -80,17 +89,25 @@ export const TeamView: React.FC = () => {
       return `${player.number ? `#${player.number} ` : ""}${player.name}`;
     };
 
+    const battingLineup = getBattingLineupIds(battingOrder, settings, assignments);
+    const defenseText = settings.sport === 'baseball'
+      ? Object.entries(assignments.byInning[1] || {})
+          .filter(([key]) => key !== 'dugout')
+          .map(([position, playerId]) => `${position}: ${formatPlayer(String(playerId))}`)
+          .join(', ')
+      : Array.from({ length: assignments.innings }, (_, i) => {
+          const inningNum = i + 1;
+          const inning = assignments.byInning[inningNum];
+          return `Inning ${inningNum}: ${Object.entries(inning || {}).filter(([key]) => key !== 'dugout').map(([position, playerId]) => `${position}: ${formatPlayer(String(playerId))}`).join(', ')}`;
+        }).join('\n');
+
     const text = `
 Team: ${branding.teamName}
 Batting Order:
-${battingOrder.map((id, i) => `${i + 1}. ${formatPlayer(id)}`).join('\n')}
+${battingLineup.map((id, i) => `${i + 1}. ${formatPlayer(id)}`).join('\n')}
 
-Defensive Rotation:
-${Array.from({ length: assignments.innings }, (_, i) => {
-  const inningNum = i + 1;
-  const inning = assignments.byInning[inningNum];
-  return `Inning ${inningNum}: ${Object.entries(inning || {}).filter(([k]) => k !== 'dugout').map(([pos, pid]) => `${pos}: ${formatPlayer(String(pid))}`).join(', ')}`;
-}).join('\n')}
+${settings.sport === 'baseball' ? 'Defensive Lineup' : 'Defensive Rotation'}:
+${defenseText}
     `.trim();
 
     navigator.clipboard.writeText(text);
@@ -254,9 +271,17 @@ ${Array.from({ length: assignments.innings }, (_, i) => {
             {activeTab === 'postgame' && (
               <PostGameTab 
                 players={players}
+                battingOrder={battingOrder}
                 assignments={assignments}
+                settings={settings}
+                teamName={branding.teamName}
+                opponentName={activeGame?.meta.opponent}
                 gameLog={gameLog}
                 onSaveLog={setGameLog}
+                activeGameName={activeGame?.meta.name}
+                onStartNewGame={handleStartNewGameFromLog}
+                onDeleteCurrentGame={handleDeleteCurrentGame}
+                syncStatus={syncStatus}
               />
             )}
             {activeTab === 'games' && (

@@ -2,6 +2,7 @@ export interface Player {
   id: string;
   name: string;
   number?: string;
+  grade?: "6" | "7" | "8";
   walkoutSongName?: string;
   walkoutSongDataUrl?: string;
   appleMusicSongId?: string;
@@ -44,6 +45,7 @@ export interface AdditionalDefensivePosition {
 export interface Settings {
   sport?: "softball" | "baseball";
   battingFormat?: "standard" | "continuous";
+  battingCount: number;
   inningsCount: number;
   allowEmptyOutfield: boolean;
   requireDugout: boolean;
@@ -58,6 +60,8 @@ export interface Settings {
   customRules: string[];
 }
 
+export type TeamType = NonNullable<Settings["sport"]>;
+
 export interface GameMeta {
   name: string;
   date: string;
@@ -68,12 +72,105 @@ export interface GameMeta {
 
 export interface GameLog {
   actualInnings: number;
+  status?: "not_started" | "in_progress" | "final";
+  currentInning?: number;
+  half?: "top" | "bottom";
+  outs?: number;
+  ourSide?: "home" | "away";
+  ourScore?: number;
+  opponentScore?: number;
+  ourRunsByInning?: Record<number, number>;
+  opponentRunsByInning?: Record<number, number>;
+  ourHits?: number;
+  opponentHits?: number;
+  ourErrors?: number;
+  opponentErrors?: number;
+  currentBatterId?: string;
+  currentPitcherId?: string;
+  opponentHitters?: OpponentHitter[];
+  currentOpponentHitterId?: string;
+  currentPitchSequence?: PitchCall[];
+  events?: GameEvent[];
   playerStats: {
-    [playerId: string]: {
-      ab: number;
-      played: boolean; // whether they actually showed up/played
-    };
+    [playerId: string]: PlayerGameStats;
   };
+}
+
+export interface PlayerGameStats {
+  ab: number;
+  played: boolean;
+  runs?: number;
+  hits?: number;
+  doubles?: number;
+  triples?: number;
+  homeRuns?: number;
+  rbi?: number;
+  walks?: number;
+  hitByPitch?: number;
+  strikeouts?: number;
+  errors?: number;
+  pitches?: number;
+  pitchingStrikeouts?: number;
+  walksAllowed?: number;
+}
+
+export type PlateAppearanceOutcome =
+  | "single"
+  | "double"
+  | "triple"
+  | "home_run"
+  | "walk"
+  | "hit_by_pitch"
+  | "reached_on_error"
+  | "strikeout"
+  | "out";
+
+export type PitchCall = "ball" | "strike";
+
+export interface OpponentHitter {
+  id: string;
+  number: string;
+}
+
+export interface GameStateSnapshot {
+  actualInnings: number;
+  status: "not_started" | "in_progress" | "final";
+  currentInning: number;
+  half: "top" | "bottom";
+  outs: number;
+  ourSide: "home" | "away";
+  ourScore: number;
+  opponentScore: number;
+  ourRunsByInning: Record<number, number>;
+  opponentRunsByInning: Record<number, number>;
+  ourHits: number;
+  opponentHits: number;
+  ourErrors: number;
+  opponentErrors: number;
+  currentBatterId?: string;
+  currentPitcherId?: string;
+  opponentHitters: OpponentHitter[];
+  currentOpponentHitterId?: string;
+  currentPitchSequence: PitchCall[];
+  playerStats: Record<string, PlayerGameStats>;
+}
+
+export interface GameEvent {
+  id: string;
+  type: "plate_appearance" | "opponent" | "pitch" | "fielding_error" | "substitution" | "inning" | "score" | "game" | "lineup";
+  inning: number;
+  half: "top" | "bottom";
+  createdAt: string;
+  description: string;
+  playerId?: string;
+  secondaryPlayerId?: string;
+  position?: string;
+  outcome?: PlateAppearanceOutcome;
+  resultCode?: string;
+  battingSide?: "our" | "opponent";
+  opponentHitterId?: string;
+  pitchSequence?: PitchCall[];
+  before: GameStateSnapshot;
 }
 
 export interface SavedGame {
@@ -124,6 +221,15 @@ export interface SeasonFairnessMetrics {
       avgBenchPerGame: number;
       totalAB: number;
       avgABPerGame: number;
+      totalHits: number;
+      totalRuns: number;
+      totalRbi: number;
+      totalWalks: number;
+      totalStrikeouts: number;
+      totalErrors: number;
+      totalPitches: number;
+      totalPitchingStrikeouts: number;
+      totalWalksAllowed: number;
     }
   };
   teamStats: {

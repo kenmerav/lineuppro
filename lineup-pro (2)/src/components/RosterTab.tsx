@@ -6,7 +6,7 @@ import { cn } from '../lib/utils';
 
 interface RosterTabProps {
   players: Player[];
-  onAdd: (name: string, number?: string) => void;
+  onAdd: (name: string, number?: string, grade?: Player['grade']) => void;
   onBulkAdd: (names: string) => void;
   onUpdate: (id: string, updates: Partial<Player>) => void;
   onDelete: (id: string) => void;
@@ -19,17 +19,20 @@ export const RosterTab: React.FC<RosterTabProps> = ({
 }) => {
   const [newName, setNewName] = useState('');
   const [newNumber, setNewNumber] = useState('');
+  const [newGrade, setNewGrade] = useState<Player['grade'] | ''>('');
   const [bulkNames, setBulkNames] = useState('');
   const [isBulk, setIsBulk] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editNumber, setEditNumber] = useState('');
+  const [editGrade, setEditGrade] = useState<Player['grade'] | ''>('');
 
   const handleAdd = () => {
     if (newName.trim()) {
-      onAdd(newName.trim(), newNumber.trim() || undefined);
+      onAdd(newName.trim(), newNumber.trim() || undefined, newGrade || undefined);
       setNewName('');
       setNewNumber('');
+      setNewGrade('');
     }
   };
 
@@ -45,11 +48,16 @@ export const RosterTab: React.FC<RosterTabProps> = ({
     setEditingId(player.id);
     setEditName(player.name);
     setEditNumber(player.number || '');
+    setEditGrade(player.grade || '');
   };
 
   const saveEdit = () => {
     if (editingId && editName.trim()) {
-      onUpdate(editingId, { name: editName.trim(), number: editNumber.trim() || undefined });
+      onUpdate(editingId, {
+        name: editName.trim(),
+        number: editNumber.trim() || undefined,
+        grade: editGrade || undefined,
+      });
       setEditingId(null);
     }
   };
@@ -109,15 +117,26 @@ export const RosterTab: React.FC<RosterTabProps> = ({
             </button>
           </div>
         ) : (
-          <div className="flex gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[80px_100px_minmax(0,1fr)_auto]">
             <input
               type="text"
               value={newNumber}
               onChange={(e) => setNewNumber(e.target.value.replace(/[^\d]/g, '').slice(0, 3))}
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               placeholder="#"
-              className="w-20 p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+              className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
             />
+            <select
+              value={newGrade}
+              onChange={(e) => setNewGrade(e.target.value as Player['grade'] | '')}
+              className="p-3 border border-slate-200 rounded-xl bg-white text-slate-700 font-semibold focus:ring-2 focus:ring-indigo-500 outline-none"
+              aria-label="Grade"
+            >
+              <option value="">Grade</option>
+              <option value="6">6th</option>
+              <option value="7">7th</option>
+              <option value="8">8th</option>
+            </select>
             <input
               type="text"
               value={newName}
@@ -162,7 +181,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({
                   style={{ backgroundColor: player.color }}
                 />
                 {editingId === player.id ? (
-                  <div className="flex items-center gap-2 flex-1">
+                  <div className="grid grid-cols-[56px_72px_minmax(0,1fr)] items-center gap-2 flex-1">
                     <input
                       type="text"
                       value={editNumber}
@@ -172,6 +191,17 @@ export const RosterTab: React.FC<RosterTabProps> = ({
                       placeholder="#"
                       autoFocus
                     />
+                    <select
+                      value={editGrade}
+                      onChange={(e) => setEditGrade(e.target.value as Player['grade'] | '')}
+                      className="bg-slate-50 border border-slate-200 rounded px-1 py-0.5 text-slate-700 text-sm font-semibold"
+                      aria-label={`Grade for ${player.name}`}
+                    >
+                      <option value="">Grade</option>
+                      <option value="6">6th</option>
+                      <option value="7">7th</option>
+                      <option value="8">8th</option>
+                    </select>
                     <input
                       type="text"
                       value={editName}
@@ -181,12 +211,19 @@ export const RosterTab: React.FC<RosterTabProps> = ({
                     />
                   </div>
                 ) : (
-                  <span className={cn(
-                    "font-medium truncate",
-                    player.active === false ? "text-slate-400 line-through" : "text-slate-700"
-                  )}>
-                    {player.number ? `#${player.number} ` : ''}{player.name}
-                  </span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className={cn(
+                      "font-medium truncate",
+                      player.active === false ? "text-slate-400 line-through" : "text-slate-700"
+                    )}>
+                      {player.number ? `#${player.number} ` : ''}{player.name}
+                    </span>
+                    {player.grade && (
+                      <span className="flex-shrink-0 rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
+                        {player.grade}th
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
 

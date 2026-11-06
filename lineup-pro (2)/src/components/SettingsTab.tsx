@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Settings as SettingsIcon, ShieldCheck, Layout, Info, Plus, X } from 'lucide-react';
 import { DefensivePositionGroup, Settings } from '../types';
-import { getAllPositions } from '../constants';
+import { getAllPositions, getTeamTypeDefaults, TEAM_TYPES } from '../constants';
 
 interface SettingsTabProps {
   settings: Settings;
@@ -12,6 +12,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
   const [newRule, setNewRule] = useState('');
   const [newPosition, setNewPosition] = useState('');
   const [newPositionGroup, setNewPositionGroup] = useState<DefensivePositionGroup>('OUTFIELD');
+  const usesFixedLineup = settings.sport === 'baseball';
 
   const handleChange = (key: keyof Settings, value: any) => {
     onUpdate({ ...settings, [key]: value });
@@ -21,6 +22,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
     const parsed = Number.parseInt(value, 10);
     if (!Number.isFinite(parsed)) return;
     handleChange('inningsCount', Math.max(1, parsed));
+  };
+
+  const handleBattingCountChange = (value: string) => {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) return;
+    handleChange('battingCount', Math.max(1, parsed));
+  };
+
+  const handleTeamTypeChange = (value: string) => {
+    const teamType = value as NonNullable<Settings['sport']>;
+    onUpdate({ ...settings, ...getTeamTypeDefaults(teamType) });
   };
 
   const addCustomRule = () => {
@@ -77,10 +89,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
           </div>
           
           <div className="space-y-4">
-            <label className="flex flex-col gap-2 font-bold text-slate-700">Sport
-              <select aria-label="Sport" value={settings.sport || "softball"} onChange={e => handleChange("sport", e.target.value)} className="rounded-xl border border-slate-200 p-3">
-                <option value="softball">Softball (existing four-outfielder layout)</option>
-                <option value="baseball">Baseball (nine fielders, including CF)</option>
+            <label className="flex flex-col gap-2 font-bold text-slate-700">Team type
+              <select aria-label="Team type" value={settings.sport || "softball"} onChange={e => handleTeamTypeChange(e.target.value)} className="rounded-xl border border-slate-200 p-3">
+                {TEAM_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
               </select>
             </label>
             <label className="flex flex-col gap-2 font-bold text-slate-700">Batting format
@@ -89,7 +102,38 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
                 <option value="standard">Standard batting order</option>
               </select>
             </label>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {usesFixedLineup && <div className="flex items-center justify-between gap-4">
+              <p className="font-bold text-slate-700">Batters in lineup</p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleChange('battingCount', Math.max(1, settings.battingCount - 1))}
+                  className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 font-bold transition-colors hover:bg-slate-200"
+                  aria-label="Decrease batters"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  inputMode="numeric"
+                  value={settings.battingCount}
+                  onChange={(event) => handleBattingCountChange(event.target.value)}
+                  className="w-24 rounded-xl border border-slate-200 px-3 py-2 text-center font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                  aria-label="Batters in lineup"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleChange('battingCount', settings.battingCount + 1)}
+                  className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 font-bold transition-colors hover:bg-slate-200"
+                  aria-label="Increase batters"
+                >
+                  +
+                </button>
+              </div>
+            </div>}
+            {!usesFixedLineup && <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-bold text-slate-700">Innings Count</p>
                 <p className="text-xs text-slate-400">Set any positive whole number of innings.</p>
@@ -122,9 +166,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
                   +
                 </button>
               </div>
-            </div>
+            </div>}
 
-            <div className="border-t border-slate-50 pt-4 space-y-3">
+            {!usesFixedLineup && <div className="border-t border-slate-50 pt-4 space-y-3">
               <div>
                 <p className="font-bold text-slate-700">Additional Defensive Positions</p>
                 <p className="text-xs text-slate-400">Add slots such as P2 for a second pitcher or OF5 for a fifth outfielder. They are included in auto-generate, fairness, and printing.</p>
@@ -175,7 +219,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
                   ))}
                 </div>
               )}
-            </div>
+            </div>}
           </div>
         </div>
 
@@ -226,6 +270,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
               </button>
             </div>
 
+            {!usesFixedLineup && <>
             <div className="border-t border-slate-50 pt-4">
               <p className="font-bold text-slate-700 mb-2">Max Consecutive Infield Innings</p>
               <div className="flex items-center gap-2">
@@ -322,6 +367,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
                 <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${settings.requireEarlyInfieldByInning3 ? 'left-7' : 'left-1'}`} />
               </button>
             </div>
+            </>}
           </div>
         </div>
 
@@ -333,8 +379,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onUpdate }) 
           </div>
 
           <p className="text-xs text-slate-500">
-            Add plain-language rules (example: "No same position twice", "Max bench 1", "Infield by inning 3").
-            Supported patterns are enforced by auto-generate and validation.
+            {usesFixedLineup
+              ? 'Add position restrictions such as "Sam cannot play catcher." They are respected when setting the starting lineup.'
+              : 'Add plain-language rules (example: "No same position twice", "Max bench 1", "Infield by inning 3"). Supported patterns are enforced by auto-generate and validation.'}
           </p>
 
           <div className="flex gap-2">
