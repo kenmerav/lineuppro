@@ -19,7 +19,8 @@ import {
   startGame,
   undoLastEvent,
 } from './gameLog';
-import type { DefenseAssignments, Player } from './types';
+import { computeSeasonFairness } from './utils';
+import type { DefenseAssignments, Player, SavedGame } from './types';
 
 const players: Player[] = [
   { id: 'a', name: 'Alex', color: '#000000', active: true },
@@ -140,7 +141,7 @@ test('pitching, opponent and fielding events are tracked and undoable', () => {
   assert.equal(log.events.at(-1)?.description, 'Opponent run');
 });
 
-test('ball and strike checks persist in the plate appearance and count pitches', () => {
+test('ball and strike checks persist, count pitches and calculate pitcher strikes', () => {
   let log = startGame(normalizeGameLog(undefined, players, assignments), 'away');
   log = recordPitchCall(log, 'ball');
   log = recordPitchCall(log, 'strike');
@@ -155,11 +156,52 @@ test('ball and strike checks persist in the plate appearance and count pitches',
 
   log = { ...log, half: 'bottom' };
   log = recordPitchCall(log, 'ball', 'a', 'Alex');
-  assert.equal(log.playerStats.a.pitches, 1);
-  assert.deepEqual(log.currentPitchSequence, ['ball']);
+  log = recordPitchCall(log, 'strike', 'a', 'Alex');
+  log = recordPitchCall(log, 'strike', 'a', 'Alex');
+  assert.equal(log.playerStats.a.pitches, 3);
+  assert.equal(log.playerStats.a.strikesThrown, 2);
+  assert.deepEqual(log.currentPitchSequence, ['ball', 'strike', 'strike']);
   log = undoLastEvent(log);
-  assert.equal(log.playerStats.a.pitches, 0);
-  assert.deepEqual(log.currentPitchSequence, []);
+  assert.equal(log.playerStats.a.pitches, 2);
+  assert.equal(log.playerStats.a.strikesThrown, 1);
+  assert.deepEqual(log.currentPitchSequence, ['ball', 'strike']);
+});
+
+test('saved game strike totals roll into season pitcher stats', () => {
+  const log = {
+    ...normalizeGameLog(undefined, players, assignments),
+    status: 'final' as const,
+    playerStats: {
+      a: {
+        ...normalizeGameLog(undefined, players, assignments).playerStats.a,
+        hits: 4,
+        doubles: 2,
+        triples: 1,
+        homeRuns: 1,
+        hitByPitch: 2,
+        pitches: 30,
+        strikesThrown: 19,
+      },
+    },
+  };
+  const savedGame = {
+    id: 'game-1',
+    meta: { name: 'Game 1', date: '2026-11-06' },
+    players,
+    battingOrder: players.map((player) => player.id),
+    assignments,
+    settings: DEFAULT_SETTINGS,
+    branding: { teamName: 'WVC Warriors' },
+    log,
+  } satisfies SavedGame;
+
+  const season = computeSeasonFairness([savedGame], players);
+  assert.equal(season.playerStats.a.totalDoubles, 2);
+  assert.equal(season.playerStats.a.totalTriples, 1);
+  assert.equal(season.playerStats.a.totalHomeRuns, 1);
+  assert.equal(season.playerStats.a.totalHitByPitch, 2);
+  assert.equal(season.playerStats.a.totalPitches, 30);
+  assert.equal(season.playerStats.a.totalStrikesThrown, 19);
 });
 
 test('line score keeps runs in their inning and undo restores the chart', () => {

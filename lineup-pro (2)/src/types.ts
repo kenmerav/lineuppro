@@ -110,6 +110,7 @@ export interface PlayerGameStats {
   strikeouts?: number;
   errors?: number;
   pitches?: number;
+  strikesThrown?: number;
   pitchingStrikeouts?: number;
   walksAllowed?: number;
 }
@@ -222,12 +223,17 @@ export interface SeasonFairnessMetrics {
       totalAB: number;
       avgABPerGame: number;
       totalHits: number;
+      totalDoubles: number;
+      totalTriples: number;
+      totalHomeRuns: number;
       totalRuns: number;
       totalRbi: number;
       totalWalks: number;
+      totalHitByPitch: number;
       totalStrikeouts: number;
       totalErrors: number;
       totalPitches: number;
+      totalStrikesThrown: number;
       totalPitchingStrikeouts: number;
       totalWalksAllowed: number;
     }

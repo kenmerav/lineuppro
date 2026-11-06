@@ -26,6 +26,7 @@ export const emptyPlayerGameStats = (played = true): PlayerGameStats => ({
   strikeouts: 0,
   errors: 0,
   pitches: 0,
+  strikesThrown: 0,
   pitchingStrikeouts: 0,
   walksAllowed: 0,
 });
@@ -438,6 +439,7 @@ export const recordPitchCall = (
   next.playerStats[pitcherId] = pitcher;
   pitcher.played = true;
   pitcher.pitches = (pitcher.pitches || 0) + 1;
+  if (call === "strike") pitcher.strikesThrown = (pitcher.strikesThrown || 0) + 1;
   next.currentPitcherId = pitcherId;
 });
 

@@ -42,6 +42,7 @@ import {
   recordOpponentTotal,
   recordOut,
   recordPlateAppearance,
+  recordPitchCall,
   recordSubstitution,
   removeOpponentHitter,
   resumeGame,
@@ -82,6 +83,8 @@ const RESULT_OPTIONS = ['K', 'BB', 'HBP', '1B', '2B', '3B', 'HR', 'E1', 'E2', 'E
 const QUICK_RESULTS = ['K', 'BB', '1B', '2B', '3B', 'HR', 'E1', 'OUT'];
 
 const numberValue = (value: number | undefined) => value || 0;
+const strikePercentage = (strikes: number | undefined, pitches: number | undefined) =>
+  pitches ? `${((numberValue(strikes) / pitches) * 100).toFixed(1)}%` : '—';
 const outcomeLabel = (outcome: PlateAppearanceOutcome | undefined) =>
   OUTCOMES.find((item) => item.value === outcome)?.label || 'PA';
 
@@ -149,6 +152,9 @@ export const PostGameTab: React.FC<PostGameTabProps> = ({
 
   const playerName = (id: string) => playerMap.get(id)?.name || 'Unknown player';
   const atBat = isOurAtBat(log);
+  const currentPitcherStats = pitcherId ? log.playerStats[pitcherId] : undefined;
+  const currentBalls = log.currentPitchSequence.filter((call) => call === 'ball').length;
+  const currentStrikes = log.currentPitchSequence.filter((call) => call === 'strike').length;
   const opponentLabel = opponentName?.trim() || 'Opponent';
   const lineScoreInnings = Array.from(
     { length: Math.max(7, log.actualInnings, log.currentInning) },
@@ -572,6 +578,29 @@ export const PostGameTab: React.FC<PostGameTabProps> = ({
                       {log.opponentHitters.map((hitter) => <option key={hitter.id} value={hitter.id}>#{hitter.number}</option>)}
                     </select>
                   </label>
+                  <div className="border border-slate-300 bg-white p-3" aria-label="Pitch tracker">
+                    <div className="grid grid-cols-3 divide-x divide-slate-200 text-center">
+                      <div><p className="text-[10px] font-black uppercase text-slate-400">Balls</p><p className="text-2xl font-black text-emerald-700">{currentBalls}</p></div>
+                      <div><p className="text-[10px] font-black uppercase text-slate-400">Strikes</p><p className="text-2xl font-black text-red-600">{currentStrikes}</p></div>
+                      <div><p className="text-[10px] font-black uppercase text-slate-400">PA Pitches</p><p className="text-2xl font-black text-slate-900">{log.currentPitchSequence.length}</p></div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => commit(recordPitchCall(log, 'ball', pitcherId, playerName(pitcherId)))}
+                        disabled={!pitcherId || !log.currentOpponentHitterId}
+                        className="h-12 border border-emerald-700 bg-emerald-50 text-base font-black text-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
+                      >Ball</button>
+                      <button
+                        onClick={() => commit(recordPitchCall(log, 'strike', pitcherId, playerName(pitcherId)))}
+                        disabled={!pitcherId || !log.currentOpponentHitterId}
+                        className="h-12 border border-red-700 bg-red-50 text-base font-black text-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+                      >Strike</button>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-2 text-xs font-bold text-slate-500">
+                      <span>Game pitches <strong className="text-slate-900">{numberValue(currentPitcherStats?.pitches)}</strong></span>
+                      <span>Strike % <strong className="text-slate-900">{strikePercentage(currentPitcherStats?.strikesThrown, currentPitcherStats?.pitches)}</strong></span>
+                    </div>
+                  </div>
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <label className="text-xs font-black uppercase text-slate-500">Result
@@ -605,15 +634,15 @@ export const PostGameTab: React.FC<PostGameTabProps> = ({
 
       {view === 'stats' && (
         <section className="overflow-x-auto">
-          <table className="w-full min-w-[900px] border-collapse text-sm">
-            <thead><tr className="border-b-2 border-slate-200 text-left text-xs uppercase text-slate-400"><th className="p-2">Player</th><th className="p-2">Played</th><th className="p-2">AB</th><th className="p-2">H</th><th className="p-2">AVG</th><th className="p-2">R</th><th className="p-2">RBI</th><th className="p-2">BB</th><th className="p-2">K</th><th className="p-2">E</th><th className="p-2">Pitches</th><th className="p-2">Pitch K</th><th className="p-2">BB allowed</th></tr></thead>
+          <table className="w-full min-w-[1250px] border-collapse text-sm">
+            <thead><tr className="border-b-2 border-slate-200 text-left text-xs uppercase text-slate-400"><th className="p-2">Player</th><th className="p-2">Played</th><th className="p-2">AB</th><th className="p-2">H</th><th className="p-2">2B</th><th className="p-2">3B</th><th className="p-2">HR</th><th className="p-2">AVG</th><th className="p-2">R</th><th className="p-2">RBI</th><th className="p-2">BB</th><th className="p-2">HBP</th><th className="p-2">K</th><th className="p-2">E</th><th className="p-2">Pitches</th><th className="p-2">Strikes</th><th className="p-2">Strike %</th><th className="p-2">Pitch K</th><th className="p-2">BB allowed</th></tr></thead>
             <tbody>{players.map((player) => {
               const stats = log.playerStats[player.id] || emptyPlayerGameStats(player.active !== false);
               const avg = stats.ab > 0 ? numberValue(stats.hits) / stats.ab : 0;
               return <tr key={player.id} className="border-b border-slate-100">
                 <td className="p-2 font-semibold text-slate-800">{player.name}</td>
                 <td className="p-2"><button onClick={() => togglePlayed(player.id)} disabled={isFinal} className={`${stats.played ? 'text-emerald-600' : 'text-slate-300'} disabled:cursor-not-allowed`} title={isFinal ? 'Resume the game to edit' : 'Toggle played'}><CheckCircle2 size={20} /></button></td>
-                <td className="p-2">{stats.ab}</td><td className="p-2">{numberValue(stats.hits)}</td><td className="p-2 font-bold">{avg.toFixed(3).replace(/^0/, '')}</td><td className="p-2">{numberValue(stats.runs)}</td><td className="p-2">{numberValue(stats.rbi)}</td><td className="p-2">{numberValue(stats.walks)}</td><td className="p-2">{numberValue(stats.strikeouts)}</td><td className="p-2">{numberValue(stats.errors)}</td><td className="p-2">{numberValue(stats.pitches)}</td><td className="p-2">{numberValue(stats.pitchingStrikeouts)}</td><td className="p-2">{numberValue(stats.walksAllowed)}</td>
+                <td className="p-2">{stats.ab}</td><td className="p-2">{numberValue(stats.hits)}</td><td className="p-2">{numberValue(stats.doubles)}</td><td className="p-2">{numberValue(stats.triples)}</td><td className="p-2">{numberValue(stats.homeRuns)}</td><td className="p-2 font-bold">{avg.toFixed(3).replace(/^0/, '')}</td><td className="p-2">{numberValue(stats.runs)}</td><td className="p-2">{numberValue(stats.rbi)}</td><td className="p-2">{numberValue(stats.walks)}</td><td className="p-2">{numberValue(stats.hitByPitch)}</td><td className="p-2">{numberValue(stats.strikeouts)}</td><td className="p-2">{numberValue(stats.errors)}</td><td className="p-2">{numberValue(stats.pitches)}</td><td className="p-2">{numberValue(stats.strikesThrown)}</td><td className="p-2 font-bold">{strikePercentage(stats.strikesThrown, stats.pitches)}</td><td className="p-2">{numberValue(stats.pitchingStrikeouts)}</td><td className="p-2">{numberValue(stats.walksAllowed)}</td>
               </tr>;
             })}</tbody>
           </table>
