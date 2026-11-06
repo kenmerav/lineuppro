@@ -1,8 +1,28 @@
-const CACHE_NAME = 'lineuppro-offline-v1';
-const APP_SHELL = ['/', '/index.html', '/logo.svg', '/manifest.webmanifest'];
+const CACHE_NAME = 'lineuppro-offline-v2';
+const APP_SHELL = ['/index.html', '/logo.svg', '/manifest.webmanifest'];
+
+const cacheAppShell = async () => {
+  const cache = await caches.open(CACHE_NAME);
+  const homeResponse = await fetch('/');
+  if (!homeResponse.ok) throw new Error('Could not cache the app shell.');
+
+  await cache.put('/', homeResponse.clone());
+  const html = await homeResponse.text();
+  const assetPaths = [...html.matchAll(/(?:src|href)="([^"]+)"/g)]
+    .map((match) => match[1])
+    .filter((path) => path.startsWith('/') && !path.startsWith('/api/'));
+
+  await Promise.all([...new Set([...APP_SHELL, ...assetPaths])].map(async (path) => {
+    try {
+      await cache.add(path);
+    } catch (error) {
+      console.error(`Could not cache ${path}`, error);
+    }
+  }));
+};
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+  event.waitUntil(cacheAppShell());
   self.skipWaiting();
 });
 
