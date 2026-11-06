@@ -292,10 +292,10 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ players, assignments
           <div className="border-b border-slate-200 px-4 py-3">
             <h3 className="font-bold text-slate-800">Season Player Stats</h3>
           </div>
-          <table className="w-full min-w-[900px] border-collapse text-sm">
+          <table className="w-full min-w-[1250px] border-collapse text-sm">
             <thead>
               <tr className="border-b-2 border-slate-200 text-left text-xs uppercase text-slate-400">
-                <th className="p-3">Player</th><th className="p-3">G</th><th className="p-3">AB</th><th className="p-3">H</th><th className="p-3">AVG</th><th className="p-3">R</th><th className="p-3">RBI</th><th className="p-3">BB</th><th className="p-3">K</th><th className="p-3">E</th><th className="p-3">Pitches</th><th className="p-3">Pitch K</th><th className="p-3">BB Allowed</th>
+                <th className="p-3">Player</th><th className="p-3">G</th><th className="p-3">AB</th><th className="p-3">H</th><th className="p-3">2B</th><th className="p-3">3B</th><th className="p-3">HR</th><th className="p-3">AVG</th><th className="p-3">R</th><th className="p-3">RBI</th><th className="p-3">BB</th><th className="p-3">HBP</th><th className="p-3">K</th><th className="p-3">E</th><th className="p-3">Pitches</th><th className="p-3">Strikes</th><th className="p-3">Strike %</th><th className="p-3">Pitch K</th><th className="p-3">BB Allowed</th>
               </tr>
             </thead>
             <tbody>
@@ -303,9 +303,10 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ players, assignments
                 const stats = seasonMetrics.playerStats[player.id];
                 if (!stats || stats.gamesPlayed === 0) return null;
                 const average = stats.totalAB > 0 ? stats.totalHits / stats.totalAB : 0;
+                const strikeRate = stats.totalPitches > 0 ? `${((stats.totalStrikesThrown / stats.totalPitches) * 100).toFixed(1)}%` : '—';
                 return (
                   <tr key={player.id} className="border-b border-slate-100 last:border-0">
-                    <td className="p-3 font-semibold text-slate-800">{player.name}</td><td className="p-3">{stats.gamesPlayed}</td><td className="p-3">{stats.totalAB}</td><td className="p-3">{stats.totalHits}</td><td className="p-3 font-bold">{average.toFixed(3).replace(/^0/, '')}</td><td className="p-3">{stats.totalRuns}</td><td className="p-3">{stats.totalRbi}</td><td className="p-3">{stats.totalWalks}</td><td className="p-3">{stats.totalStrikeouts}</td><td className="p-3">{stats.totalErrors}</td><td className="p-3">{stats.totalPitches}</td><td className="p-3">{stats.totalPitchingStrikeouts}</td><td className="p-3">{stats.totalWalksAllowed}</td>
+                    <td className="p-3 font-semibold text-slate-800">{player.name}</td><td className="p-3">{stats.gamesPlayed}</td><td className="p-3">{stats.totalAB}</td><td className="p-3">{stats.totalHits}</td><td className="p-3">{stats.totalDoubles}</td><td className="p-3">{stats.totalTriples}</td><td className="p-3">{stats.totalHomeRuns}</td><td className="p-3 font-bold">{average.toFixed(3).replace(/^0/, '')}</td><td className="p-3">{stats.totalRuns}</td><td className="p-3">{stats.totalRbi}</td><td className="p-3">{stats.totalWalks}</td><td className="p-3">{stats.totalHitByPitch}</td><td className="p-3">{stats.totalStrikeouts}</td><td className="p-3">{stats.totalErrors}</td><td className="p-3">{stats.totalPitches}</td><td className="p-3">{stats.totalStrikesThrown}</td><td className="p-3 font-bold">{strikeRate}</td><td className="p-3">{stats.totalPitchingStrikeouts}</td><td className="p-3">{stats.totalWalksAllowed}</td>
                   </tr>
                 );
               })}

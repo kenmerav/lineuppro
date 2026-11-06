@@ -487,12 +487,17 @@ export const computeSeasonFairness = (
       totalAB: 0,
       avgABPerGame: 0,
       totalHits: 0,
+      totalDoubles: 0,
+      totalTriples: 0,
+      totalHomeRuns: 0,
       totalRuns: 0,
       totalRbi: 0,
       totalWalks: 0,
+      totalHitByPitch: 0,
       totalStrikeouts: 0,
       totalErrors: 0,
       totalPitches: 0,
+      totalStrikesThrown: 0,
       totalPitchingStrikeouts: 0,
       totalWalksAllowed: 0
     };
@@ -508,8 +513,10 @@ export const computeSeasonFairness = (
           totalInfield: 0, totalOutfield: 0, totalBench: 0, gamesPlayed: 0,
           avgInfieldPerGame: 0, avgOutfieldPerGame: 0, avgBenchPerGame: 0,
           totalAB: 0, avgABPerGame: 0,
-          totalHits: 0, totalRuns: 0, totalRbi: 0, totalWalks: 0,
+          totalHits: 0, totalDoubles: 0, totalTriples: 0, totalHomeRuns: 0,
+          totalRuns: 0, totalRbi: 0, totalWalks: 0, totalHitByPitch: 0,
           totalStrikeouts: 0, totalErrors: 0, totalPitches: 0,
+          totalStrikesThrown: 0,
           totalPitchingStrikeouts: 0, totalWalksAllowed: 0
         };
       }
@@ -523,12 +530,17 @@ export const computeSeasonFairness = (
         const logged = game.log.playerStats[pid];
         stats[pid].totalAB += logged.ab;
         stats[pid].totalHits += logged.hits || 0;
+        stats[pid].totalDoubles += logged.doubles || 0;
+        stats[pid].totalTriples += logged.triples || 0;
+        stats[pid].totalHomeRuns += logged.homeRuns || 0;
         stats[pid].totalRuns += logged.runs || 0;
         stats[pid].totalRbi += logged.rbi || 0;
         stats[pid].totalWalks += logged.walks || 0;
+        stats[pid].totalHitByPitch += logged.hitByPitch || 0;
         stats[pid].totalStrikeouts += logged.strikeouts || 0;
         stats[pid].totalErrors += logged.errors || 0;
         stats[pid].totalPitches += logged.pitches || 0;
+        stats[pid].totalStrikesThrown += logged.strikesThrown || 0;
         stats[pid].totalPitchingStrikeouts += logged.pitchingStrikeouts || 0;
         stats[pid].totalWalksAllowed += logged.walksAllowed || 0;
       }
