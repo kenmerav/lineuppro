@@ -108,7 +108,7 @@ export const LandingPage: React.FC = () => {
           <div>
             <div className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full px-3 py-1 text-xs font-semibold text-slate-200">
               <Sparkles size={14} />
-              Built for baseball and softball coaches
+              Built for Little League and middle school baseball coaches
             </div>
             <h1 className="mt-5 text-4xl md:text-6xl font-black leading-tight text-white">
               Build your lineup quickly.
@@ -145,8 +145,8 @@ export const LandingPage: React.FC = () => {
                 <div className="text-xs text-slate-300 uppercase tracking-wider">Roster to postgame</div>
               </div>
               <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3">
-                <div className="text-2xl font-black text-white">2 sports</div>
-                <div className="text-xs text-slate-300 uppercase tracking-wider">Baseball + softball</div>
+                <div className="text-2xl font-black text-white">2 team types</div>
+                <div className="text-xs text-slate-300 uppercase tracking-wider">Little League + middle school</div>
               </div>
             </div>
           </div>
@@ -189,7 +189,7 @@ export const LandingPage: React.FC = () => {
         <section className="mt-20 grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
           <div>
             <h2 className="text-3xl font-black text-white">Simple coaching workflow</h2>
-            <p className="mt-3 text-slate-300">Lineup Pro is designed around how baseball and softball coaches actually run game day.</p>
+            <p className="mt-3 text-slate-300">Lineup Pro is designed around how Little League and middle school baseball coaches actually run game day.</p>
             <div className="mt-6 space-y-3">
               {steps.map((step, index) => (
                 <div key={step} className="flex items-center gap-3 rounded-xl border border-white/15 bg-white/10 p-3">

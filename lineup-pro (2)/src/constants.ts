@@ -1,4 +1,27 @@
-import type { AdditionalDefensivePosition, Settings } from "./types";
+import type { AdditionalDefensivePosition, Settings, TeamType } from "./types";
+
+export const TEAM_TYPES: ReadonlyArray<{ value: TeamType; label: string }> = [
+  { value: "baseball", label: "Middle School Baseball" },
+  { value: "softball", label: "Little League" },
+];
+
+export const getTeamTypeLabel = (sport?: Settings["sport"]) =>
+  TEAM_TYPES.find((teamType) => teamType.value === sport)?.label || "Little League";
+
+export const getTeamTypeDefaults = (teamType: TeamType): Partial<Settings> => teamType === "baseball"
+  ? {
+      sport: "baseball",
+      battingFormat: "standard",
+      battingCount: 9,
+      inningsCount: 7,
+      allowSamePositionBackToBack: true,
+      preventDuplicatePositionInGame: false,
+      requireEarlyInfieldByInning3: false,
+    }
+  : {
+      sport: "softball",
+      battingFormat: "continuous",
+    };
 
 // Legacy softball defaults remain unchanged for teams without a sport setting.
 export const POSITION_GROUPS = {
@@ -11,6 +34,8 @@ export const ALL_POSITIONS = [
   ...POSITION_GROUPS.INFIELD,
   ...POSITION_GROUPS.OUTFIELD,
 ];
+
+export const BATTING_ONLY_POSITIONS = ["DH", "EH"] as const;
 
 type PositionSettings = Pick<Settings, "additionalPositions" | "sport">;
 
@@ -66,6 +91,7 @@ export const DEFAULT_SETTINGS = {
   inningsCount: 5,
   sport: "softball" as const,
   battingFormat: "continuous" as const,
+  battingCount: 9,
   allowEmptyOutfield: true,
   requireDugout: true,
   strictSwap: true,

@@ -15,6 +15,7 @@ type Player = {
   id: string;
   name: string;
   number?: string;
+  grade?: "6" | "7" | "8";
   walkoutSongName?: string;
   walkoutSongDataUrl?: string;
   appleMusicSongId?: string;
@@ -29,6 +30,9 @@ type Player = {
 type TeamBranding = { teamName: string; logoDataUrl?: string; bannerColor?: string };
 type AdditionalDefensivePosition = { id: string; group: "INFIELD" | "OUTFIELD" };
 type Settings = {
+  sport?: "softball" | "baseball";
+  battingFormat?: "standard" | "continuous";
+  battingCount: number;
   inningsCount: number;
   allowEmptyOutfield: boolean;
   requireDugout: boolean;
@@ -143,6 +147,9 @@ const STORE_FILE = path.resolve(DATA_DIR, "store.json");
 
 const DEFAULT_SETTINGS: Settings = {
   inningsCount: 5,
+  sport: "softball",
+  battingFormat: "continuous",
+  battingCount: 9,
   allowEmptyOutfield: true,
   requireDugout: true,
   strictSwap: true,
@@ -610,6 +617,32 @@ app.put("/api/teams/:teamId", auth, async (req: AuthedRequest, res) => {
   } catch (error) {
     console.error("Failed to update team", error);
     return res.status(500).json({ error: "Failed to update team." });
+  }
+});
+
+app.delete("/api/teams/:teamId", auth, async (req: AuthedRequest, res) => {
+  try {
+    const team = await teamFor(req, req.params.teamId);
+    if (!team) return res.status(404).json({ error: "Team not found" });
+
+    if (USE_SUPABASE) {
+      const { error } = await supabase!
+        .from("teams")
+        .delete()
+        .eq("id", team.id)
+        .eq("owner_id", req.userId!);
+      if (error) throw error;
+      return res.status(204).end();
+    }
+
+    teams.delete(team.id);
+    gamesByTeam.delete(team.id);
+    draftsByTeam.delete(team.id);
+    await persistStore();
+    return res.status(204).end();
+  } catch (error) {
+    console.error("Failed to delete team", error);
+    return res.status(500).json({ error: "Failed to delete team." });
   }
 });
 

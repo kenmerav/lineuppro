@@ -7,6 +7,7 @@ type Player = {
   id: string;
   name: string;
   number?: string;
+  grade?: "6" | "7" | "8";
   walkoutSongName?: string;
   walkoutSongDataUrl?: string;
   appleMusicSongId?: string;
@@ -21,6 +22,9 @@ type Player = {
 type TeamBranding = { teamName: string; logoDataUrl?: string; bannerColor?: string };
 type AdditionalDefensivePosition = { id: string; group: "INFIELD" | "OUTFIELD" };
 type Settings = {
+  sport?: "softball" | "baseball";
+  battingFormat?: "standard" | "continuous";
+  battingCount: number;
   inningsCount: number;
   allowEmptyOutfield: boolean;
   requireDugout: boolean;
@@ -114,6 +118,9 @@ const TOKEN_COOKIE = "lineup_pro_token";
 const SESSION_SECONDS = 14 * 24 * 60 * 60;
 const DEFAULT_SETTINGS: Settings = {
   inningsCount: 5,
+  sport: "softball",
+  battingFormat: "continuous",
+  battingCount: 9,
   allowEmptyOutfield: true,
   requireDugout: true,
   strictSwap: true,
@@ -467,6 +474,22 @@ app.put("/api/teams/:teamId", auth, async (c) => {
   } catch (error) {
     console.error("Failed to update team", error);
     return c.json({ error: "Failed to update team." }, 500);
+  }
+});
+
+app.delete("/api/teams/:teamId", auth, async (c) => {
+  try {
+    const team = await teamFor(c, c.req.param("teamId"));
+    if (!team) return c.json({ error: "Team not found" }, 404);
+
+    const { error } = await db(c.env).from("teams").delete()
+      .eq("id", team.id)
+      .eq("owner_id", c.get("userId"));
+    if (error) throw error;
+    return c.body(null, 204);
+  } catch (error) {
+    console.error("Failed to delete team", error);
+    return c.json({ error: "Failed to delete team." }, 500);
   }
 });
 

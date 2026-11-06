@@ -1,0 +1,17 @@
+{
+  "name": "Lineup Pro",
+  "short_name": "Lineup Pro",
+  "description": "Baseball lineup and game scorebook",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

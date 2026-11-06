@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Shield, AlertCircle, CheckCircle2, RefreshCw, Trash2, ChevronLeft, ChevronRight, UserPlus, LayoutGrid, Map as MapIcon, Save } from 'lucide-react';
-import { Player, DefenseAssignments, Settings } from '../types';
-import { getAllPositions, getPositionGroups } from '../constants';
+import { Player, DefenseAssignments, InningAssignments, Settings } from '../types';
+import { BATTING_ONLY_POSITIONS, getAllPositions, getPositionGroups } from '../constants';
 import { validateAll, autoFixViolations } from '../utils';
 import { cn, getContrastColor } from '../lib/utils';
 import { DefensiveFieldDiagram } from './DefensiveFieldDiagram';
@@ -17,6 +17,81 @@ interface DefenseTabProps {
   selectedInning: number;
   onSelectedInningChange: (inning: number) => void;
 }
+
+export const getDefensePickerPlayers = (
+  players: Player[],
+  inning: InningAssignments | undefined,
+  allPositions: string[],
+) => players.filter((player) =>
+  !allPositions.some((position) => inning?.[position] === player.id)
+);
+
+export const assignPlayerToDefense = (
+  assignments: DefenseAssignments,
+  allPositions: string[],
+  inningNum: number,
+  pos: string,
+  playerId: string | null,
+  strictSwap: boolean,
+  mirrorAcrossInnings: boolean,
+): DefenseAssignments => {
+  const sourceInning = assignments.byInning[inningNum];
+  const inning = {
+    ...(sourceInning || {}),
+    dugout: [...(sourceInning?.dugout || [])],
+  };
+  const nextAssignments: DefenseAssignments = {
+    ...assignments,
+    byInning: { ...assignments.byInning },
+  };
+
+  const currentPlayerAtPos = inning[pos];
+
+  if (playerId === null) {
+    if (pos !== 'dugout') delete inning[pos];
+  } else {
+    let oldPosOfNewPlayer: string | null = null;
+    for (const position of allPositions) {
+      if (inning[position] === playerId) {
+        oldPosOfNewPlayer = position;
+        break;
+      }
+    }
+    const wasInDugout = inning.dugout.includes(playerId);
+
+    if (pos === 'dugout') {
+      if (oldPosOfNewPlayer) delete inning[oldPosOfNewPlayer];
+      if (!wasInDugout) inning.dugout.push(playerId);
+    } else {
+      if (oldPosOfNewPlayer) {
+        if (currentPlayerAtPos && strictSwap) {
+          inning[oldPosOfNewPlayer] = currentPlayerAtPos;
+        } else {
+          delete inning[oldPosOfNewPlayer];
+          if (currentPlayerAtPos && !inning.dugout.includes(currentPlayerAtPos)) {
+            inning.dugout.push(currentPlayerAtPos);
+          }
+        }
+      } else if (wasInDugout) {
+        inning.dugout = inning.dugout.filter(id => id !== playerId);
+        if (currentPlayerAtPos) inning.dugout.push(currentPlayerAtPos);
+      } else if (currentPlayerAtPos) {
+        inning.dugout.push(currentPlayerAtPos);
+      }
+      inning[pos] = playerId;
+    }
+  }
+
+  if (mirrorAcrossInnings) {
+    for (let gameInning = 1; gameInning <= assignments.innings; gameInning++) {
+      nextAssignments.byInning[gameInning] = { ...inning, dugout: [...inning.dugout] };
+    }
+  } else {
+    nextAssignments.byInning[inningNum] = inning;
+  }
+
+  return nextAssignments;
+};
 
 export const DefenseTab: React.FC<DefenseTabProps> = ({
   players,
@@ -34,6 +109,17 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
   const validation = useMemo(() => validateAll(assignments, players, settings), [assignments, players, settings]);
   const positionGroups = useMemo(() => getPositionGroups(settings), [settings]);
   const allPositions = useMemo(() => getAllPositions(settings), [settings]);
+  const usesFixedLineup = settings.sport === 'baseball';
+  const lineupPositions = useMemo(
+    () => usesFixedLineup ? [...allPositions, ...BATTING_ONLY_POSITIONS] : allPositions,
+    [allPositions, usesFixedLineup],
+  );
+  const openPositionCount = usesFixedLineup
+    ? allPositions.filter((position) => !assignments.byInning[1]?.[position]).length
+    : 0;
+  const displayedInnings = usesFixedLineup
+    ? [1]
+    : Array.from({ length: assignments.innings }, (_, index) => index + 1);
 
   const handleInningsInputChange = (value: string) => {
     const parsed = Number.parseInt(value, 10);
@@ -44,65 +130,15 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
   const handleAssign = (playerId: string | null) => {
     if (!selectedCell) return;
     const { inning: inningNum, pos } = selectedCell;
-    const nextAssignments = { ...assignments };
-    const inning = { ...nextAssignments.byInning[inningNum] };
-
-    // Current player at this position
-    const currentPlayerAtPos = inning[pos];
-    
-    if (playerId === null) {
-      // Clear position
-      if (pos === 'dugout') {
-        // This shouldn't really happen with the current UI but for completeness
-      } else {
-        delete inning[pos];
-      }
-    } else {
-      // Find where the new player was previously in this inning
-      let oldPosOfNewPlayer: string | null = null;
-      for (const p of allPositions) {
-        if (inning[p] === playerId) {
-          oldPosOfNewPlayer = p;
-          break;
-        }
-      }
-      const wasInDugout = inning.dugout.includes(playerId);
-
-      // Swap logic
-      if (pos === 'dugout') {
-        // Move player to dugout
-        if (oldPosOfNewPlayer) delete inning[oldPosOfNewPlayer];
-        if (!wasInDugout) inning.dugout = [...inning.dugout, playerId];
-      } else {
-        // Assigning to a specific position
-        if (oldPosOfNewPlayer) {
-          // Player was at another position -> swap
-          if (currentPlayerAtPos && settings.strictSwap) {
-            inning[oldPosOfNewPlayer] = currentPlayerAtPos;
-          } else {
-            delete inning[oldPosOfNewPlayer];
-            if (currentPlayerAtPos && !inning.dugout.includes(currentPlayerAtPos)) {
-              inning.dugout = [...inning.dugout, currentPlayerAtPos];
-            }
-          }
-        } else if (wasInDugout) {
-          // Player was in dugout
-          inning.dugout = inning.dugout.filter(id => id !== playerId);
-          if (currentPlayerAtPos) {
-            inning.dugout = [...inning.dugout, currentPlayerAtPos];
-          }
-        } else {
-          // Player was unassigned (newly added to roster)
-          if (currentPlayerAtPos) {
-            inning.dugout = [...inning.dugout, currentPlayerAtPos];
-          }
-        }
-        inning[pos] = playerId;
-      }
-    }
-
-    nextAssignments.byInning[inningNum] = inning;
-    onUpdate(nextAssignments);
+    onUpdate(assignPlayerToDefense(
+      assignments,
+      lineupPositions,
+      inningNum,
+      pos,
+      playerId,
+      settings.strictSwap,
+      usesFixedLineup,
+    ));
     setSelectedCell(null);
   };
 
@@ -113,26 +149,36 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <Shield className="text-indigo-600" />
-          <h2 className="text-xl font-bold text-slate-800">Defensive Rotation</h2>
+          <h2 className="text-xl font-bold text-slate-800">{usesFixedLineup ? 'Defensive Lineup' : 'Defensive Rotation'}</h2>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className={cn(
             "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold",
-            validation.errors.length > 0 ? "bg-red-100 text-red-700" : 
+            usesFixedLineup && openPositionCount > 0 ? "bg-amber-100 text-amber-700" :
+            validation.errors.length > 0 ? "bg-red-100 text-red-700" :
             validation.warnings.length > 0 ? "bg-amber-100 text-amber-700" : 
             "bg-green-100 text-green-700"
           )}>
-            {validation.errors.length > 0 ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
-            {validation.errors.length > 0 ? `${validation.errors.length} Violations` : 
-             validation.warnings.length > 0 ? `${validation.warnings.length} Warnings` : "Valid Rotation"}
+            {usesFixedLineup
+              ? openPositionCount > 0 ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />
+              : validation.errors.length > 0 ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+            {usesFixedLineup
+              ? openPositionCount > 0
+                ? `${openPositionCount} Open ${openPositionCount === 1 ? 'Position' : 'Positions'}`
+                : 'Lineup Ready'
+              : validation.errors.length > 0
+                ? `${validation.errors.length} Violations`
+                : validation.warnings.length > 0
+                  ? `${validation.warnings.length} Warnings`
+                  : 'Valid Rotation'}
           </div>
           
           <button 
             onClick={onGenerate}
             className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-indigo-700 transition-colors"
           >
-            <RefreshCw size={18} /> Auto Generate
+            <RefreshCw size={18} /> {usesFixedLineup ? 'Set Starting Lineup' : 'Auto Generate'}
           </button>
 
           <button
@@ -159,7 +205,7 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
       </div>
 
       {/* Validation Panel */}
-      {(validation.errors.length > 0 || validation.warnings.length > 0) && (
+      {!usesFixedLineup && (validation.errors.length > 0 || validation.warnings.length > 0) && (
         <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4 space-y-2">
           {validation.errors.map((err, i) => (
             <div key={i} className="flex items-start gap-2 text-red-600 text-sm font-medium">
@@ -200,7 +246,7 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
           </button>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        {!usesFixedLineup && <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="inline-flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1.5">
             <span className="px-2 text-xs font-bold uppercase tracking-wider text-slate-400">Planned innings</span>
             <button
@@ -258,7 +304,7 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
               <ChevronRight size={18} />
             </button>
           </div>
-        </div>
+        </div>}
       </div>
 
       {viewMode === 'field' ? (
@@ -266,36 +312,35 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
           assignments={assignments}
           players={players}
           settings={settings}
-          inning={selectedInning}
-          title={`Field View - Inning ${selectedInning}`}
+          inning={usesFixedLineup ? 1 : selectedInning}
+          title={usesFixedLineup ? 'Starting Defense' : `Field View - Inning ${selectedInning}`}
         />
       ) : (
-        <div className="min-w-[800px]">
+        <div className={usesFixedLineup ? "mx-auto max-w-2xl" : "min-w-[800px]"}>
           <table className="w-full border-separate border-spacing-1">
             <thead>
               <tr>
                 <th className="w-24 p-2 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Position</th>
-                {Array.from({ length: assignments.innings }, (_, i) => (
-                  <th key={i} className="p-2 text-center text-sm font-bold text-slate-700 bg-slate-100 rounded-lg">
-                    Inning {i + 1}
+                {displayedInnings.map((inning) => (
+                  <th key={inning} className="p-2 text-center text-sm font-bold text-slate-700 bg-slate-100 rounded-lg">
+                    {usesFixedLineup ? 'Player' : `Inning ${inning}`}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td colSpan={assignments.innings + 1} className="py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Infield</td>
+                <td colSpan={displayedInnings.length + 1} className="py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Infield</td>
               </tr>
               {positionGroups.INFIELD.map(pos => (
                 <tr key={pos}>
                   <td className="p-2 font-bold text-slate-600 text-sm">{pos}</td>
-                  {Array.from({ length: assignments.innings }, (_, i) => {
-                    const inningNum = i + 1;
+                  {displayedInnings.map((inningNum) => {
                     const playerId = assignments.byInning[inningNum]?.[pos];
                     const player = playerId ? playerMap.get(playerId) : null;
                     const isAbsent = player?.active === false;
                     return (
-                      <td key={i} className="p-0">
+                      <td key={inningNum} className="p-0">
                         <button
                           onClick={() => setSelectedCell({ inning: inningNum, pos })}
                           className={cn(
@@ -306,7 +351,12 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
                           )}
                           style={player ? { backgroundColor: player.color, color: getContrastColor(player.color) } : {}}
                         >
-                          {player?.name || "+"}
+                          {player ? (
+                            <span className="flex flex-col items-center leading-tight">
+                              <span>{player.name}</span>
+                              {player.grade && <span className="text-[9px] opacity-80">{player.grade}th</span>}
+                            </span>
+                          ) : "+"}
                           {isAbsent && (
                             <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm" title="Player is Absent">
                               <X size={10} strokeWidth={4} />
@@ -320,18 +370,17 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
               ))}
 
               <tr>
-                <td colSpan={assignments.innings + 1} className="py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Outfield</td>
+                <td colSpan={displayedInnings.length + 1} className="py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Outfield</td>
               </tr>
               {positionGroups.OUTFIELD.map(pos => (
                 <tr key={pos}>
                   <td className="p-2 font-bold text-slate-600 text-sm">{pos}</td>
-                  {Array.from({ length: assignments.innings }, (_, i) => {
-                    const inningNum = i + 1;
+                  {displayedInnings.map((inningNum) => {
                     const playerId = assignments.byInning[inningNum]?.[pos];
                     const player = playerId ? playerMap.get(playerId) : null;
                     const isAbsent = player?.active === false;
                     return (
-                      <td key={i} className="p-0">
+                      <td key={inningNum} className="p-0">
                         <button
                           onClick={() => setSelectedCell({ inning: inningNum, pos })}
                           className={cn(
@@ -342,7 +391,12 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
                           )}
                           style={player ? { backgroundColor: player.color, color: getContrastColor(player.color) } : {}}
                         >
-                          {player?.name || "+"}
+                          {player ? (
+                            <span className="flex flex-col items-center leading-tight">
+                              <span>{player.name}</span>
+                              {player.grade && <span className="text-[9px] opacity-80">{player.grade}th</span>}
+                            </span>
+                          ) : "+"}
                           {isAbsent && (
                             <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm" title="Player is Absent">
                               <X size={10} strokeWidth={4} />
@@ -355,16 +409,50 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
                 </tr>
               ))}
 
+              {usesFixedLineup && <>
+                <tr>
+                  <td colSpan={displayedInnings.length + 1} className="py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Batting-only roles</td>
+                </tr>
+                {BATTING_ONLY_POSITIONS.map(pos => {
+                  const playerId = assignments.byInning[1]?.[pos];
+                  const player = playerId ? playerMap.get(playerId) : null;
+                  const isAbsent = player?.active === false;
+                  return (
+                    <tr key={pos}>
+                      <td className="p-2 font-bold text-slate-600 text-sm">{pos}</td>
+                      <td className="p-0">
+                        <button
+                          onClick={() => setSelectedCell({ inning: 1, pos })}
+                          className={cn(
+                            "w-full h-12 rounded-lg border-2 transition-all flex items-center justify-center font-bold text-sm relative",
+                            player ? "border-transparent" : "border-dashed border-slate-200 text-slate-300 hover:border-slate-300",
+                            selectedCell?.inning === 1 && selectedCell?.pos === pos ? "ring-2 ring-indigo-500 ring-offset-2" : "",
+                            isAbsent ? "opacity-40 grayscale" : ""
+                          )}
+                          style={player ? { backgroundColor: player.color, color: getContrastColor(player.color) } : {}}
+                        >
+                          {player ? (
+                            <span className="flex flex-col items-center leading-tight">
+                              <span>{player.name}</span>
+                              {player.grade && <span className="text-[9px] opacity-80">{player.grade}th</span>}
+                            </span>
+                          ) : "+"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </>}
+
               <tr>
-                <td colSpan={assignments.innings + 1} className="py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Dugout</td>
+                <td colSpan={displayedInnings.length + 1} className="py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">Dugout</td>
               </tr>
               <tr>
                 <td className="p-2 font-bold text-slate-600 text-sm">Bench</td>
-                {Array.from({ length: assignments.innings }, (_, i) => {
-                  const inningNum = i + 1;
+                {displayedInnings.map((inningNum) => {
                   const dugout = assignments.byInning[inningNum]?.dugout || [];
                   return (
-                    <td key={i} className="p-1 align-top">
+                    <td key={inningNum} className="p-1 align-top">
                       <div className="min-h-[60px] p-2 bg-slate-50 rounded-xl border border-slate-100 flex flex-wrap gap-1">
                         {dugout.map(pid => {
                           const p = playerMap.get(pid);
@@ -411,7 +499,7 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-bold text-slate-800">
-                Assign to {selectedCell.pos} (Inning {selectedCell.inning})
+                Assign to {selectedCell.pos}{usesFixedLineup ? '' : ` (Inning ${selectedCell.inning})`}
               </h3>
               <button onClick={() => setSelectedCell(null)} className="p-1 hover:bg-slate-100 rounded-full">
                 <X size={20} />
@@ -424,16 +512,20 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
               >
                 Clear Slot
               </button>
-              {players.map(p => {
+              {getDefensePickerPlayers(
+                players,
+                assignments.byInning[selectedCell.inning],
+                lineupPositions,
+              ).map(p => {
                 const currentInning = assignments.byInning[selectedCell.inning];
                 let currentPos = "Unassigned";
-                for (const pos of allPositions) {
+                for (const pos of lineupPositions) {
                   if (currentInning?.[pos] === p.id) {
                     currentPos = pos;
                     break;
                   }
                 }
-                if (currentInning?.dugout.includes(p.id)) currentPos = "Dugout";
+                if (currentInning?.dugout?.includes(p.id)) currentPos = "Dugout";
 
                 return (
                   <button
@@ -443,6 +535,7 @@ export const DefenseTab: React.FC<DefenseTabProps> = ({
                     style={{ backgroundColor: p.color, color: getContrastColor(p.color) }}
                   >
                     <span className="font-bold text-sm">{p.name}</span>
+                    {p.grade && <span className="text-[10px] opacity-80">{p.grade}th grade</span>}
                     <span className="text-[10px] opacity-80">Currently: {currentPos}</span>
                   </button>
                 );
