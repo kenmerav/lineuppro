@@ -214,7 +214,7 @@ test('paper score sheet includes both batting charts without private grades', ()
     gameMeta: { name: 'Game 2', date: '2026-11-10', opponent: 'Falcons', location: 'WVC Field' },
   }));
 
-  for (const value of ['Our Batting', 'Opponent Batting', 'WVC Warriors batting', 'Falcons batting', 'PA 6', 'RESULT KEY', 'WVC Field']) {
+  for (const value of ['Our Batting', 'Opponent Batting', 'WVC Warriors batting', 'Falcons batting', 'PA 5', 'Pitch 8 ball', 'Pitch 8 strike', 'RESULT KEY', 'WVC Field']) {
     assert.ok(html.includes(value));
   }
   assert.doesNotMatch(html, /8th|Grade/);
