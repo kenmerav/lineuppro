@@ -214,9 +214,10 @@ test('paper score sheet includes both batting charts without private grades', ()
     gameMeta: { name: 'Game 2', date: '2026-11-10', opponent: 'Falcons', location: 'WVC Field' },
   }));
 
-  for (const value of ['Our Batting', 'Opponent Batting', 'WVC Warriors batting', 'Falcons batting', 'PA 5', 'Pitch 8 ball', 'Pitch 8 strike', 'RESULT KEY', 'WVC Field']) {
-    assert.ok(html.includes(value));
+  for (const value of ['Our Batting', 'Opponent Batting', 'WVC Warriors batting', 'Falcons batting', 'PA 5', 'Pitch 8 ball', 'Pitch 8 strike', 'PA PITCHES', 'GAME TOTAL', 'Our pitch total', 'RESULT KEY', 'WVC Field']) {
+    assert.ok(html.includes(value), `Expected paper score sheet to include ${value}`);
   }
+  assert.doesNotMatch(html, /INN ____/);
   assert.doesNotMatch(html, /8th|Grade/);
 });
 

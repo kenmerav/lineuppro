@@ -58,15 +58,20 @@ const ScoreGrid = ({
   title,
   rows,
   opponent = false,
+  pitchTotalLabel,
 }: {
   title: string;
   rows: Array<{ id: string; number?: string; name?: string; position?: string }>;
   opponent?: boolean;
+  pitchTotalLabel: string;
 }) => (
   <div>
     <div className="mb-1 flex items-end justify-between">
       <h2 className="text-sm font-black uppercase">{title}</h2>
-      <p className="text-[8px] font-bold text-slate-600">Mark each pitch B or S, then write the inning and result.</p>
+      <div className="flex items-center gap-3">
+        <p className="text-[8px] font-bold text-slate-600">Mark each pitch B or S, then record PA pitches and running total.</p>
+        <div className="border-2 border-slate-900 px-2 py-1 text-[8px] font-black uppercase">{pitchTotalLabel}: __________</div>
+      </div>
     </div>
     <table className="w-full table-fixed border-collapse text-[8px]">
       <thead>
@@ -91,7 +96,7 @@ const ScoreGrid = ({
             {Array.from({ length: PLATE_APPEARANCES }, (_, paIndex) => (
               <td key={paIndex} className="border border-slate-900 p-0.5 align-top">
                 <div className="mb-0.5 flex justify-between text-[5px] font-black text-slate-500">
-                  <span>INN ____</span><span>RESULT ______</span>
+                  <span>RESULT __________________</span>
                 </div>
                 {(['B', 'S'] as const).map((call) => (
                   <div key={call} className="mb-px grid items-center gap-px" style={{ gridTemplateColumns: `8px repeat(${PITCH_SLOTS}, minmax(0, 1fr))` }}>
@@ -101,6 +106,9 @@ const ScoreGrid = ({
                     ))}
                   </div>
                 ))}
+                <div className="mt-0.5 flex justify-between border-t border-slate-400 pt-px text-[5px] font-black text-slate-600">
+                  <span>PA PITCHES ____</span><span>GAME TOTAL ____</span>
+                </div>
               </td>
             ))}
             <td className="border border-slate-900" />
@@ -188,7 +196,7 @@ export const PaperScoreSheet: React.FC<PaperScoreSheetProps> = ({
       const player = playerMap.get(id);
       return { id, number: player?.number, name: player?.name, position: positionFor(id) };
     }),
-    ...Array.from({ length: Math.max(1, 10 - battingIds.length) }, (_, index) => ({ id: `our-blank-${index}` })),
+    ...Array.from({ length: Math.max(0, 9 - battingIds.length) }, (_, index) => ({ id: `our-blank-${index}` })),
   ];
   const opponentRows = Array.from({ length: 10 }, (_, index) => ({ id: `opponent-${index}` }));
   const opponentName = gameMeta?.opponent?.trim() || '________________________';
@@ -198,14 +206,14 @@ export const PaperScoreSheet: React.FC<PaperScoreSheetProps> = ({
       <article className="paper-score-page min-h-[7.35in] w-full bg-white p-[0.18in]">
         <SheetHeader pageTitle="Paper Score Sheet · Our Batting" branding={branding} meta={gameMeta} opponentName={opponentName} />
         <LineScore teamName={branding.teamName} opponentName={opponentName} ourSide={ourSide} />
-        <div className="mt-2"><ScoreGrid title={`${branding.teamName} batting`} rows={ourRows} /></div>
+        <div className="mt-2"><ScoreGrid title={`${branding.teamName} batting`} rows={ourRows} pitchTotalLabel="Opponent pitch total" /></div>
         <SheetFooter />
       </article>
 
       <article className="paper-score-page min-h-[7.35in] w-full bg-white p-[0.18in]">
         <SheetHeader pageTitle="Paper Score Sheet · Opponent Batting" branding={branding} meta={gameMeta} opponentName={opponentName} />
         <LineScore teamName={branding.teamName} opponentName={opponentName} ourSide={ourSide} />
-        <div className="mt-2"><ScoreGrid title={`${opponentName} batting`} rows={opponentRows} opponent /></div>
+        <div className="mt-2"><ScoreGrid title={`${opponentName} batting`} rows={opponentRows} opponent pitchTotalLabel="Our pitch total" /></div>
         <SheetFooter opponent />
       </article>
     </div>
