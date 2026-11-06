@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { BATTING_ONLY_POSITIONS, getAllPositions, getPositionGroups, getTeamTypeDefaults, getTeamTypeLabel, DEFAULT_SETTINGS, TEAM_TYPES } from './constants';
 import { DefensiveFieldDiagram } from './components/DefensiveFieldDiagram';
 import { BaseballLineupCard } from './components/BaseballLineupCard';
+import { PaperScoreSheet } from './components/PaperScoreSheet';
 import { assignPlayerToDefense, DefenseTab, getDefensePickerPlayers } from './components/DefenseTab';
 import { RosterTab } from './components/RosterTab';
 import { SettingsTab } from './components/SettingsTab';
@@ -192,6 +193,31 @@ test('printed middle school lineup honors the batter count', () => {
   assert.match(battingTable, /Player 9/);
   assert.doesNotMatch(battingTable, /Player 10/);
   assert.match(html, /Available substitutes \/ bench[\s\S]*Player 10/);
+});
+
+test('paper score sheet includes both batting charts without private grades', () => {
+  const players = Array.from({ length: 9 }, (_, index) => ({
+    id: `p${index + 1}`,
+    name: `Warrior ${index + 1}`,
+    number: String(index + 1),
+    grade: '8' as const,
+    color: '#000000',
+  }));
+  const firstInning: InningAssignments = { dugout: [] };
+  getAllPositions(baseball).forEach((position, index) => { firstInning[position] = players[index].id; });
+  const html = renderToStaticMarkup(React.createElement(PaperScoreSheet, {
+    players,
+    battingOrder: players.map((player) => player.id),
+    assignments: { innings: 7, byInning: { 1: firstInning } },
+    settings: baseball,
+    branding: { teamName: 'WVC Warriors' },
+    gameMeta: { name: 'Game 2', date: '2026-11-10', opponent: 'Falcons', location: 'WVC Field' },
+  }));
+
+  for (const value of ['Our Batting', 'Opponent Batting', 'WVC Warriors batting', 'Falcons batting', 'PA 6', 'RESULT KEY', 'WVC Field']) {
+    assert.ok(html.includes(value));
+  }
+  assert.doesNotMatch(html, /8th|Grade/);
 });
 
 test('softball defaults preserve the existing four-outfielder layout', () => {
